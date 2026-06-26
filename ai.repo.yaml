@@ -1,0 +1,29 @@
+# Optional shared manifest. Teams can bootstrap this source set with:
+#   aimgr repo apply-manifest https://raw.githubusercontent.com/<owner>/dt-playbook-skills/<ref>/ai.repo.yaml
+#
+# Repository-source format: aimgr discovers skills/ and agents/ subdirectories
+# automatically. No explicit resource list needed here.
+#
+# Note: this manifest pulls in *agent skills* only. The `dtctl` CLI binary
+# itself is not installed by aimgr — install it separately via Homebrew, the
+# shell/PowerShell installer, or a binary download:
+#   https://dynatrace-oss.github.io/dtctl/docs/installation/
+
+sources:
+  - name: dt-playbook-skills
+    url: https://github.com/<owner>/dt-playbook-skills
+    ref: main
+
+  # dtctl ships its operator skill under skills/dtctl/ — teaches agents how
+  # to drive the dtctl CLI (verbs, flags, output envelope).
+  - name: dtctl
+    url: https://github.com/dynatrace-oss/dtctl
+    ref: main
+
+  # Dynatrace domain skills: DQL essentials, observability (services,
+  # frontends, tracing, hosts, k8s, AWS/Azure/GCP, logs, problems,
+  # predictive analytics, alerting), platform (dashboards, notebooks,
+  # JS runtime), and migration.
+  - name: dynatrace-for-ai
+    url: https://github.com/Dynatrace/dynatrace-for-ai
+    ref: main
