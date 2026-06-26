@@ -26,6 +26,11 @@ sources:
   # frontends, tracing, hosts, k8s, AWS/Azure/GCP, logs, problems,
   # predictive analytics, alerting), platform (dashboards, notebooks,
   # JS runtime), and migration.
+  #
+  # discovery: generic — this repo ships a .claude-plugin/marketplace.json
+  # that aimgr's default "auto" mode tries to resolve as plugin resources
+  # and fails. Forcing generic discovery imports the skills/ tree directly.
   - name: dynatrace-for-ai
     url: https://github.com/Dynatrace/dynatrace-for-ai
     ref: main
+    discovery: generic
