@@ -38,7 +38,7 @@ skills (DQL, observability, platform, migration) as aimgr sources.
 
 ```powershell
 # 1. Apply the manifest — registers all three repos as aimgr sources
-aimgr repo apply-manifest https://raw.githubusercontent.com/<owner>/dt-playbook-skills/main/ai.repo.yaml
+aimgr repo apply-manifest https://raw.githubusercontent.com/dt-jr25/dt-playbook-skills/main/ai.repo.yaml
 
 # 2. Target GitHub Copilot
 aimgr config set install.targets copilot
@@ -57,7 +57,7 @@ If you don't want the `dtctl` and `dynatrace-for-ai` skills pulled in (e.g. you
 already manage them separately), skip the manifest and add only this repo:
 
 ```powershell
-aimgr repo add gh:<owner>/dt-playbook-skills --ref v1.0.0
+aimgr repo add gh:dt-jr25/dt-playbook-skills --ref v1.0.0
 aimgr config set install.targets copilot
 aimgr install "skill/dt-*" "agent/dt-*"
 ```
@@ -102,7 +102,7 @@ Releases follow semver:
 Pin a `--ref` tag in `aimgr repo add` if you want predictable upgrades:
 
 ```powershell
-aimgr repo add gh:<owner>/dt-playbook-skills --ref v1.0.0
+aimgr repo add gh:dt-jr25/dt-playbook-skills --ref v1.0.0
 ```
 
 ## Contributing improvements

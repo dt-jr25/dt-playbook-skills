@@ -9,9 +9,11 @@
 # shell/PowerShell installer, or a binary download:
 #   https://dynatrace-oss.github.io/dtctl/docs/installation/
 
+version: 1
+
 sources:
   - name: dt-playbook-skills
-    url: https://github.com/<owner>/dt-playbook-skills
+    url: https://github.com/dt-jr25/dt-playbook-skills
     ref: main
 
   # dtctl ships its operator skill under skills/dtctl/ — teaches agents how
