@@ -34,6 +34,7 @@
 .openclaw/
 .kiro/
 .junie/
+ai.package.yaml
 
 # Track the CI/PR templates if the repo eventually adds any — everything else
 # in .github/ is agent-client runtime state.
