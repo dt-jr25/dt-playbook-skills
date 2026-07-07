@@ -41,14 +41,24 @@ Everything else lives below.
 
 | Requirement | Notes |
 | --- | --- |
-| `dtctl` CLI installed and on PATH | `dtctl version` to verify |
+| `dtctl` CLI installed and on PATH | `dtctl version` to verify. Install via Homebrew, `install.ps1`, or `install.sh` — aimgr does **not** install the binary. |
 | Authenticated context for the target tenant | `dtctl auth whoami` to confirm; switch with `dtctl ctx use <name>` |
-| `dt-dql-essentials` skill installed for the agent | `dtctl skills install` if not already present |
+| **`dtctl` operator skill** (from the `dtctl` repo) | Non-optional. Teaches the agent the exact `dtctl` verbs, flags, `--agent` envelope, output shape, and PowerShell quoting caveats — so it doesn't shell out to `dtctl` from memory. Installed via this repo's `ai.repo.yaml` manifest (see the repo README). |
+| **`dt-dql-essentials` skill** (from `dynatrace-for-ai`) | Non-optional. Every Discovery Query in every playbook is DQL. Installed via this repo's `ai.repo.yaml` manifest (see the repo README). |
 | A target context folder in the workspace (e.g. `dt-playground-readonly/`, `<client>-sprint-readonly/`) | Folder name must match the `dtctl` context name. Reports live in `<context-folder>/<subfolder>/` per the skill. |
+
+> 📚 **Read the `dtctl` operator skill AND `dt-dql-essentials` before Step 1 fires.** The host agent's routing model may not auto-load them from the catalog once it's already executing inside a `@dt-*-review` agent — name them explicitly in your read list. Skipping either is the single biggest cause of the agent shelling out with wrong `dtctl` flags or writing invalid DQL.
+
+> 🚦 **How to handle a missing skill (applies to every skill named in any playbook's prereqs, not just the two above).** The expected user workflow is that skills are pre-installed via `aimgr repo apply-manifest` + `aimgr install "skill/*"` (see the repo README). The agent's job is to **detect** a missing skill and **report** it — never to install it. Concretely:
+> 
+> 1. Treat "installed" as "the skill's guidance is in your current context" — do not probe the filesystem, do not run `aimgr`, `dtctl skills`, `npx`, or any other package manager to check.
+> 2. If a required skill is not in your context by the point in the flow where it's needed, print one chat message quoting the exact install commands from the repo README (`aimgr repo apply-manifest …` then `aimgr install …`) and halt.
+> 3. Do **not** offer to run those commands yourself, even if the user asks. Installation is a user-side decision because it touches their agent-client config and their `aimgr` state.
+> 4. Resume only after the user confirms they've installed the missing skill and re-invoked the agent.
 
 > 💡 **Cost guardrails:** Every Discovery Query in any review skill uses tight `from:` windows (≤ 24 h for headline numbers, ≤ 1 h or 15 min for cardinality / samples / pattern scans) and `limit`. Do not omit them — Grail tables can be very large.
 
-The per-data-source skill may add data-source-specific requirements (e.g. the `dt-obs-logs` skill for the logs skill, extra token scopes for bizevents).
+The per-data-source skill may add data-source-specific requirements (e.g. `dt-obs-logs` for the logs skill; `dt-app-dashboards` for the dashboard-build skill; extra token scopes for bizevents). Those are also non-optional — read them at the same point in the flow. The missing-skill procedure above applies uniformly.
 
 ---
 
@@ -313,7 +323,7 @@ The agent should always **re-run all queries** for the new environment rather th
 
 ## 🔗 Related References
 
-- `dt-dql-essentials` skill (`dtctl skills install`) — DQL syntax, pitfalls, operator reference.
+- `dt-dql-essentials` skill (from `dynatrace-for-ai`, installed via `aimgr install skill/dt-dql-essentials` or `npx skills add dynatrace/dynatrace-for-ai`) — DQL syntax, pitfalls, operator reference.
 - Data-source-specific skills as listed in each playbook (`dt-obs-logs`, etc.).
 - Sibling skills in this repo: `dt-bizevents-review`, `dt-logs-review`, `dt-business-process-review`.
 - Dynatrace docs: per data source — linked from each playbook's Related References section.

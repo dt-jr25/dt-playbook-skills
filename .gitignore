@@ -1,0 +1,144 @@
+# =============================================================================
+# dt-playbook-skills — .gitignore
+# =============================================================================
+# This repo publishes the source-of-truth playbook skills + thin agents under:
+#   skills/dt-*/SKILL.md
+#   agents/dt-*.md
+#   ai.repo.yaml
+#   README.md
+#
+# Everything below is either:
+#   - runtime output produced by aimgr / dtctl / an agent locally, or
+#   - upstream skills (dtctl operator skill, dynatrace-for-ai domain skills)
+#     that this repo intentionally does NOT vendor — aimgr installs them
+#     from the sources declared in ai.repo.yaml when a workspace applies
+#     the manifest.
+#
+# If you need to install the upstream skills into this workspace for local
+# testing, run the aimgr commands from README.md — the .gitignore entries
+# below make sure those installed copies stay out of the git history.
+
+# -----------------------------------------------------------------------------
+# aimgr / agent-client runtime install targets
+# -----------------------------------------------------------------------------
+# aimgr symlinks or copies installed skills + agents into your agent client's
+# runtime directory. Keep the source (this repo) clean of them so upstream
+# skills (dtctl, dt-obs-*, dt-app-*, dt-dql-essentials, dt-migration, …) can
+# live locally without leaking into the repo.
+.github/skills/
+.github/agents/
+.agents/
+.claude/
+.cursor/
+.opencode/
+.openclaw/
+.kiro/
+.junie/
+
+# Track the CI/PR templates if the repo eventually adds any — everything else
+# in .github/ is agent-client runtime state.
+!.github/workflows/
+!.github/ISSUE_TEMPLATE/
+!.github/pull_request_template.md
+!.github/CODEOWNERS
+
+# aimgr's local cache + registry state
+.aimgr/
+.aimgr-cache/
+
+# npx / skills.sh scratch (if a teammate installs via npx instead of aimgr)
+.skills-cache/
+
+# -----------------------------------------------------------------------------
+# Playbook runtime output
+# -----------------------------------------------------------------------------
+# Written by the review playbooks when they run against a real tenant.
+# Do NOT commit tenant data, mappings, or reports to this source repo.
+
+# Per-workspace context ↔ folder mapping written by dt-playbook-common.
+.dt-playbook-mappings.yaml
+
+# Context folders created by the review playbooks. The naming convention is
+# "<tenant>-<env>-<safety>/" (e.g. acme-prod-readonly/, demo-live-readonly/).
+# Match the common safety suffixes so teammates can run playbooks against
+# their own tenants without accidentally committing reports.
+*-readonly/
+*-readwrite-mine/
+*-readwrite-all/
+*-dangerously-unrestricted/
+*-sprint/
+*-prod/
+*-dev/
+*-staging/
+*-playground/
+
+# Sub-directories written by the playbooks (belt + braces — the parent
+# context folder is already ignored above).
+event-overview-reports/
+logs-overview-reports/
+process-detail-reports/
+dashboards/
+
+# -----------------------------------------------------------------------------
+# Node / npx (needed for `npx skills add ...` if a teammate uses that path)
+# -----------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-store/
+
+# -----------------------------------------------------------------------------
+# Environment / secrets
+# -----------------------------------------------------------------------------
+# Never commit env files, tokens, or private keys — the playbooks never need
+# them (dtctl handles auth via OS keyring), so these should always stay local.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+
+# -----------------------------------------------------------------------------
+# Editor / IDE
+# -----------------------------------------------------------------------------
+# Track shared VS Code config if the team adds any; ignore per-user state.
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.history/
+
+.idea/
+*.iml
+*.swp
+*.swo
+*.swn
+*~
+
+# -----------------------------------------------------------------------------
+# OS junk
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# -----------------------------------------------------------------------------
+# Logs
+# -----------------------------------------------------------------------------
+*.log
+logs/

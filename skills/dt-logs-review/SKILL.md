@@ -44,7 +44,7 @@ Full output path: `<context-folder>/logs-overview-reports/logs-overview-<YYYY-MM
 
 | Requirement | Notes |
 | --- | --- |
-| `dt-obs-logs` skill installed for the agent | `dtctl skills install` if not already present — provides log-specific DQL patterns (`matchesPhrase`, JSON parsing, severity filters) |
+| **`dt-obs-logs` skill** (from `dynatrace-for-ai`) | Non-optional — supplies log-specific DQL patterns (`matchesPhrase`, JSON parsing, severity filters) the playbook depends on. Installed via this repo's `ai.repo.yaml` manifest (see the repo README). If not in the agent's context at Step 1, follow `dt-playbook-common` §Prerequisites' missing-skill procedure — print the install commands from the README and halt; do not run installers. |
 | Token scopes: read access to `logs` (Grail query scopes) | A read-only context (e.g. `*-readonly`) is enough |
 
 > 💡 **Extra cost note:** log buckets are routinely the largest tables in a tenant — **never** drop the `from:` clause and **never** run a `matchesPhrase()` or `parse` over an unbounded window.
