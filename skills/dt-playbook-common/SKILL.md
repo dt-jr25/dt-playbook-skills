@@ -187,6 +187,23 @@ Only run this step if the user picked **"Create a new context"** in step 3. The 
 
 > **Assumption rule (scope):** Once the user confirms `<context> → <context-folder>` in steps 3–5, treat the **mapping itself** as canonical for the rest of the conversation and for all future runs (do not re-ask which folder to use). The **step-6 intent confirmation is separate** and fires on every playbook invocation — it confirms *that* the user wants to query this environment *now*, not *which* folder it maps to.
 
+#### Prior completed-report check (before running Query 1)
+
+Before firing Query 1, list existing `<filename-stem>-*.md` files in the target report subfolder (`<context-folder>/<subfolder>/`). If the most recent file is **not** an empty-tenant report **and** was written **today (same UTC date)**, surface it and ask the user:
+
+> *"A completed `<filename-stem>` report already exists from `<HH:MM UTC>` today (`<filename>`). Do you want to re-run the full playbook, or work from the existing report?"*
+
+Present the options via `vscode_askQuestions`:
+- **📄 Work from the existing report** (recommended) → skip Step 1 and all deep-dive queries; jump directly to whatever the per-skill's "use existing report" flow specifies. For `dt-business-process-review`, this means reading the scope, correlation ID, measures, dimensions, and PII flags from the existing report and proceeding straight to the *Follow-up hand-off — offer to build a dashboard* section. For `dt-bizevents-review` and `dt-logs-review`, present the existing report path in chat and ask what the user wants to do next.
+- **🔄 Re-run the full playbook** → continue normally with Query 1.
+- **🛑 Cancel** → stop.
+
+Skip this check entirely if:
+- No prior report file exists in the subfolder, or
+- The most recent file was written on a **different UTC date** (re-running a fresh day's playbook is expected and should not be gated).
+
+---
+
 ### Step 1 — Initial overview
 
 Run the skill's **Discovery Query 1** (24 h headline numbers) first. Branch based on the result:

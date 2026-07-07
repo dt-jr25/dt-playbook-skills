@@ -58,6 +58,7 @@ ai.package.yaml
 
 # Per-workspace context ↔ folder mapping written by dt-playbook-common.
 .dt-playbook-mappings.yaml
+.vscode/
 
 # Context folders created by the review playbooks. The naming convention is
 # "<tenant>-<env>-<safety>/" (e.g. acme-prod-readonly/, demo-live-readonly/).

@@ -597,7 +597,7 @@ Skip the data dictionary, correlation IDs, transitions, funnel, PII, and recomme
 
 ## 🔀 Follow-up hand-off — offer to build a dashboard
 
-> **When this fires:** immediately after the report is written and *before* the self-improvement protocol (§`dt-playbook-common` → Playbook self-improvement protocol). Runs on every non-empty-scope run; skip on empty-scope runs (there is nothing to dashboard).
+> **When this fires:** (a) immediately after the report is written in the current session, *before* the self-improvement protocol, on every non-empty-scope run; (b) when `dt-playbook-common`'s *prior completed-report check* detects a completed report from today and the user picks **"Work from the existing report"** — in that case, read the scope, primary correlation ID, confirmed measures/dimensions, and PII flags from the existing report file and skip straight to the hand-off prompt below. Skip entirely on empty-scope runs (there is nothing to dashboard).
 
 Every business-process review naturally answers most of the questions the `dt-business-dashboard-build` skill would otherwise ask via its own Discovery Queries — the scope, the primary correlation ID, the confirmed business measures + dimensions, the PII flags, and the process step order. Offering to build the dashboard immediately after the review lets the user ship a visualization without re-running any of that work.
 

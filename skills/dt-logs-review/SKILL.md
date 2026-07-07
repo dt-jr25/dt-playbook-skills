@@ -109,6 +109,17 @@ fetch logs, from:-24h, samplingRatio: 1000
 > | sort sampledCount desc
 > ```
 
+### 2b. `loglevel` vs `status` cross-tabulation (last 1 h — detect normalization gaps)
+
+```dql
+fetch logs, from:-1h
+| summarize count = count(), by:{status, loglevel}
+| sort count desc
+| limit 20
+```
+
+> If `loglevel: DEBUG` appears but maps to `status: INFO`, severity normalization is collapsing DEBUG into INFO. If `loglevel: CRITICAL`/`FATAL` maps to `status: ERROR` that is correct but worth confirming. Any `loglevel` value without a `status` counterpart indicates a parsing gap.
+
 ### 3. Top emitters — process groups + hosts (last 24 h, sampled ×1000)
 
 ```dql
@@ -179,6 +190,7 @@ fetch logs, from:-1h
 fetch logs, from:-1h
 | fieldsSummary status, loglevel, content,
                 dt.process_group.id, dt.host.id, log.source,
+                dt.entity.process_group, dt.entity.host, dt.entity.service,
                 k8s.cluster.name, k8s.namespace.name, k8s.pod.name, k8s.container.name,
                 service.name, cloud.provider, cloud.region,
                 dt.system.bucket, dt.openpipeline.source, dt.openpipeline.pipelines
