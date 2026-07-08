@@ -13,6 +13,10 @@ description: >-
   `dt-playbook-common` FIRST for Step 0, then runs a two-part Step 2 (pick
   providers, pick event.types) before deep-dive queries. Writes to
   `<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md`.
+  After the report is saved, offers a one-click hand-off to
+  `dt-business-dashboard-build` that carries the resolved scope, correlation
+  ID, measure/dimension picks, and PII flags forward so the dashboard skill
+  can skip the Discovery Queries this review already answered.
   Do NOT use for tenant-wide bizevents inventory (use `dt-bizevents-review`
   first) or log analysis (use `dt-logs-review`).
 ---
@@ -49,6 +53,7 @@ Full output path: `<context-folder>/process-detail-reports/business-process-deta
 | --- | --- |
 | Token scopes: read access to `bizevents` (Grail query scopes) | A read-only context (e.g. `*-readonly`) is enough |
 | At least one `event.provider` already present in the tenant | If `bizevents` is empty, fall back to the `dt-bizevents-review` skill's empty-tenant fast path — there is no process to characterize |
+| **`dt-obs-tracing` skill** (from `dynatrace-for-ai`) — recommended | §8 correlation-ID discovery relies on `trace_id` / `span_id` / `dt.trace_id` semantics and — when a bizevent carries a trace id — span-to-service lookups. Loading `dt-obs-tracing` before Step 1 makes those queries correct on the first try. Not strictly required if the tenant's bizevents never carry a trace id, but assume it is required unless proven otherwise. Installed via this repo's `ai.repo.yaml` manifest (see the repo README); if not in the agent's context, follow `dt-playbook-common` §Prerequisites' missing-skill procedure. |
 
 ---
 
@@ -590,9 +595,107 @@ Skip the data dictionary, correlation IDs, transitions, funnel, PII, and recomme
 
 ---
 
+## 🔀 Follow-up hand-off — offer to build a dashboard
+
+> **When this fires:** (a) immediately after the report is written in the current session, *before* the self-improvement protocol, on every non-empty-scope run; (b) when `dt-playbook-common`'s *prior completed-report check* detects a completed report from today and the user picks **"Work from the existing report"** — in that case, read the scope, primary correlation ID, confirmed measures/dimensions, and PII flags from the existing report file and skip straight to the hand-off prompt below. Skip entirely on empty-scope runs (there is nothing to dashboard).
+
+Every business-process review naturally answers most of the questions the `dt-business-dashboard-build` skill would otherwise ask via its own Discovery Queries — the scope, the primary correlation ID, the confirmed business measures + dimensions, the PII flags, and the process step order. Offering to build the dashboard immediately after the review lets the user ship a visualization without re-running any of that work.
+
+Prompt the user via `vscode_askQuestions` with a single question titled *"Build a dashboard from this review?"* and a message body that lists the exact facts the hand-off will carry forward, so the user is approving a concrete transfer rather than a vague follow-up:
+
+```
+> Providers: [<p1>, <p2>, …]
+> Event types (from Process Map): [<t1> → <t2> → … → <tN>]
+> Recommended correlation ID: <bestCorrelationIdField>  (from §8)
+> Confirmed business measure: <measureField>  (from §14)
+> Confirmed category dimension: <dimensionField>  (from §14)
+> PII fields to exclude from any tile: [<field1>, <field2>, …]  (from §15)
+> Report path (for hand-off): <context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
+```
+
+Options:
+
+- **📊 Yes — build a dashboard now** (recommended when the report produced a clear scope, correlation ID, and at least one measure or dimension worth visualizing) → invoke `@dt-business-dashboard-build` in hand-off mode with the sidecar path pre-loaded. The dashboard skill will then run its own mandatory Step 2 question — **Business** perspective vs **Technical** perspective — and design the layout / tiles / metrics accordingly.
+- **📄 Not yet — just save the report** (recommended when the user still wants to review the findings before committing to a dashboard) → do nothing extra. The user can run `@dt-business-dashboard-build --from-report <path>` later; the sidecar is written either way.
+- **🛑 No thanks** → do nothing.
+
+> **Do not offer a layout, template, or perspective pick here.** The dashboard skill owns those decisions — the review's job is only to hand off the scope + correlation + measures + dimensions + PII flags. Historical versions of this playbook offered `simple-kpi` vs `process-journey` template picks at this point; that has been removed because it constrained the dashboard skill before it had a chance to interview the user about their audience.
+
+### What the hand-off carries forward
+
+When the user picks "Yes", pass the following into the `dt-business-dashboard-build` invocation (either as in-context recall for a same-conversation run, or via `--from-report <path>` if the invocation opens a new agent turn):
+
+| Field | Source in this report |
+| --- | --- |
+| `<providers>` | Report header `> **Scope:** providers = [...]` |
+| `<eventTypes>` | Report header `> **Scope:** event types = [...]` |
+| `<processLabel>` | Report header `> **Process label:** <name>` |
+| `<bestCorrelationIdField>` | Report §🔗 Correlation IDs → ✅ Recommended primary correlation |
+| `<measureField>` (candidates, ranked) | Report §💡 Recommended Business Metrics → 🧱 Event-level metrics |
+| `<dimensionField>` (candidates, ranked) | Report §💡 Recommended Business Metrics → 📊 Dashboard composition |
+| PII exclusions | Report §🔒 PII / Sensitive Content Findings |
+| Terminal / start step | Report §🧭 Process Map → 🛣️ Canonical happy path |
+
+See `dt-business-dashboard-build` §Step 1 (Resolve scope) for the receiving side's behaviour — it consumes the sidecar directly, skips the discovery queries the review already answered, and then runs its mandatory perspective interview + generative design steps.
+
+### Structured hand-off packet (mandatory sidecar file)
+
+On **every non-empty-scope run** — regardless of whether the user picks a "Yes" or "Not yet" hand-off option — write a small YAML sidecar next to the markdown report:
+
+```
+<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.handoff.yaml
+```
+
+The packet is the **canonical machine-readable hand-off contract** between this skill and `dt-business-dashboard-build`. The dashboard skill reads it directly (fast path) instead of re-parsing the markdown report; without it, the dashboard skill has to grep the report for each field, which is slow and brittle. Same UTC minute-stamp as the report so a report + packet pair always share a suffix.
+
+Schema (version 1):
+
+```yaml
+version: 1
+review_report: business-process-detail-<YYYY-MM-DD-HHMM>.md   # basename, relative to the sidecar
+generated_utc: <ISO-8601 timestamp>
+context: <dtctl context name>
+scope:
+  providers: [<p1>, <p2>]
+  event_types_ordered: [<t1>, <t2>, <t3>, <t4>, <t5>]   # ordered per Process Map canonical happy path
+  process_label: <human-readable name from Step 2c>
+  process_slug: <kebab-cased, lowercased, ASCII-only>
+correlation:
+  field: <bestCorrelationIdField>
+  strength: strong | weak   # from §8 winner classification; "weak" tells the dashboard skill to re-verify
+measure:
+  field: <measureField>
+  numeric_confirmed: true | false   # true iff §14 sanity-checked min/max/avg
+  candidates: [<c1>, <c2>]          # ranked, longest to shortest coverage
+dimensions:
+  primary: <dimensionField>
+  candidates: [<c1>, <c2>]
+status_field:   # nullable — only populate if §7 field-coverage matrix surfaced a plausible status
+  field: <statusField | null>
+  success_literal: <literal | null>
+pii_exclude: [<field1>, <field2>]   # empty list if §15 found nothing
+```
+
+> **Removed in v1.1:** `recommended_template` (was `simple-kpi | process-journey`). The dashboard-build skill is now generative and picks its own layout / tile mix based on the perspective the user chooses in its Step 2, so a pre-committed template hint from the review would only constrain the design without adding value. Older sidecars that still carry this key are safe to leave — the dashboard skill treats it as a hint at most.
+
+Rules:
+
+- If a field is unknown, write `null` (do not omit the key). The dashboard skill uses key presence to decide whether to skip a Discovery Query.
+- Always write the packet, even if the user picks "No thanks" — they may `@dt-business-dashboard-build --from-report <path>` later, and the packet must be available.
+- Never write secrets, PII, or sampled values into the packet — only field **names** and low-cardinality literals (`success`, `OK`, etc.).
+- Use UTF-8 without BOM. Two-space indent. No trailing whitespace.
+- Do **not** overwrite an existing packet (bump the minute, same as the report). Report and packet must share the exact same `<YYYY-MM-DD-HHMM>` suffix.
+
+### Interaction with the self-improvement protocol
+
+The self-improvement protocol (`dt-playbook-common`) still runs afterwards. If the user picks a "Yes" option, defer the improvement prompt until the dashboard-build run has also finished, so the user gets one improvement question covering both playbooks rather than two back-to-back interruptions. If the user picks "Not yet" or "No thanks", the self-improvement protocol fires immediately as normal.
+
+---
+
 ## 🔗 Related References
 
 - `dt-playbook-common` skill — shared scaffolding (Step 0 interview, mappings file, style rules).
 - `dt-bizevents-review` skill — breadth-first sibling. Run first if you don't yet know which providers/types exist.
+- `dt-business-dashboard-build` skill — downstream hand-off target. Consumes this report's scope + correlation ID + measure/dimension picks to produce a ready-to-import Dashboard JSON without re-running the Discovery Queries above.
 - `dt-dql-essentials` skill — DQL syntax, pitfalls, operator reference.
 - Dynatrace docs: *Business Events*, *Business processes (process mining)*, *Funnels & conversion DQL patterns*.

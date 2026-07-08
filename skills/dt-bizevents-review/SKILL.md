@@ -46,6 +46,8 @@ Full output path: `<context-folder>/event-overview-reports/bizevents-overview-<Y
 | --- | --- |
 | Token scopes: read access to `bizevents` (Grail query scopes) | A read-only context (e.g. `*-readonly`) is enough |
 
+> 📚 **No per-skill domain skill beyond the common two.** The two skills the common scaffolding names (`dtctl` operator + `dt-dql-essentials`) are sufficient for every Discovery Query in this playbook. Load them before Step 1.
+
 ### Step 2 — Focus question wording (bizevents)
 
 > *"Based on the overview above, are there specific `event.type`s or `event.provider`s you want the rest of the report to focus on? (Leave blank for full coverage of every notable provider.)"*

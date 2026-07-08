@@ -44,7 +44,7 @@ Full output path: `<context-folder>/logs-overview-reports/logs-overview-<YYYY-MM
 
 | Requirement | Notes |
 | --- | --- |
-| `dt-obs-logs` skill installed for the agent | `dtctl skills install` if not already present — provides log-specific DQL patterns (`matchesPhrase`, JSON parsing, severity filters) |
+| **`dt-obs-logs` skill** (from `dynatrace-for-ai`) | Non-optional — supplies log-specific DQL patterns (`matchesPhrase`, JSON parsing, severity filters) the playbook depends on. Installed via this repo's `ai.repo.yaml` manifest (see the repo README). If not in the agent's context at Step 1, follow `dt-playbook-common` §Prerequisites' missing-skill procedure — print the install commands from the README and halt; do not run installers. |
 | Token scopes: read access to `logs` (Grail query scopes) | A read-only context (e.g. `*-readonly`) is enough |
 
 > 💡 **Extra cost note:** log buckets are routinely the largest tables in a tenant — **never** drop the `from:` clause and **never** run a `matchesPhrase()` or `parse` over an unbounded window.
@@ -108,6 +108,17 @@ fetch logs, from:-24h, samplingRatio: 1000
 > | fieldsAdd estimatedCount = sampledCount * 1000
 > | sort sampledCount desc
 > ```
+
+### 2b. `loglevel` vs `status` cross-tabulation (last 1 h — detect normalization gaps)
+
+```dql
+fetch logs, from:-1h
+| summarize count = count(), by:{status, loglevel}
+| sort count desc
+| limit 20
+```
+
+> If `loglevel: DEBUG` appears but maps to `status: INFO`, severity normalization is collapsing DEBUG into INFO. If `loglevel: CRITICAL`/`FATAL` maps to `status: ERROR` that is correct but worth confirming. Any `loglevel` value without a `status` counterpart indicates a parsing gap.
 
 ### 3. Top emitters — process groups + hosts (last 24 h, sampled ×1000)
 
@@ -179,6 +190,7 @@ fetch logs, from:-1h
 fetch logs, from:-1h
 | fieldsSummary status, loglevel, content,
                 dt.process_group.id, dt.host.id, log.source,
+                dt.entity.process_group, dt.entity.host, dt.entity.service,
                 k8s.cluster.name, k8s.namespace.name, k8s.pod.name, k8s.container.name,
                 service.name, cloud.provider, cloud.region,
                 dt.system.bucket, dt.openpipeline.source, dt.openpipeline.pipelines

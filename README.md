@@ -4,15 +4,16 @@ Re-runnable Dynatrace environment-review playbooks, packaged as
 [`aimgr`](https://github.com/dynatrace-oss/ai-config-manager)-installable skills
 and custom agents for GitHub Copilot.
 
-Three playbooks are bundled:
+Four playbooks are bundled:
 
 | Playbook | Skill | Agent | Output subfolder |
 | --- | --- | --- | --- |
 | Bizevents / Business Observability overview | `dt-bizevents-review` | `@dt-bizevents-review` | `event-overview-reports/` |
 | Logs overview | `dt-logs-review` | `@dt-logs-review` | `logs-overview-reports/` |
 | Business Process detail | `dt-business-process-review` | `@dt-business-process-review` | `process-detail-reports/` |
+| Business Observability dashboard builder | `dt-business-dashboard-build` | `@dt-business-dashboard-build` | `dashboards/` |
 
-All three depend on a shared scaffolding skill **`dt-playbook-common`** that
+All four depend on a shared scaffolding skill **`dt-playbook-common`** that
 owns the Step 0 kickoff interview, intent confirmation, empty-tenant fast-path,
 duplicate-snapshot logic, PowerShell quoting, shared report style, and the
 self-improvement protocol.
@@ -70,12 +71,14 @@ In any Copilot chat inside the workspace:
 @dt-bizevents-review
 @dt-logs-review
 @dt-business-process-review
+@dt-business-dashboard-build
 ```
 
 The agent reads `dt-playbook-common` first (Step 0 interview → context/folder
 confirmation → final intent check), then runs the paired playbook skill end-to-end
-and writes the report to
-`<context-folder>/<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.md`.
+and writes the deliverable to
+`<context-folder>/<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.<ext>`
+(`.md` for the three review playbooks, `.json` for the dashboard builder).
 
 Natural-language invocation also works because each skill's `description` field
 carries trigger keywords:
@@ -83,6 +86,28 @@ carries trigger keywords:
 > "Run a bizevents overview against my prod context."
 > "Logs overview report for the demo tenant."
 > "Business process detail on the checkout funnel."
+> "Build a business observability dashboard for the claims flow."
+
+### Chaining playbooks (hand-off)
+
+`dt-business-process-review` and `dt-business-dashboard-build` are designed to
+chain. At the end of a process-review run, the agent offers a one-click
+hand-off to the dashboard builder that carries the resolved scope,
+recommended correlation ID, confirmed business measure + dimension, PII
+exclusions, and process step order forward. The dashboard skill's **hand-off
+mode** consumes those facts and skips every Discovery Query the review
+already answered (§1–§3, and depending on what the review resolved, §4/§5/§7
+too), only running the incremental queries it truly needs — chiefly §8
+(owning-service discovery) for the `simple-kpi` template. This cuts Grail
+scan cost roughly in half on a paired run.
+
+Manual hand-off later (e.g. after reviewing the report):
+
+```
+@dt-business-dashboard-build --from-report <context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
+```
+
+or simply *"Build a Business KPI dashboard from the review at `<path>`."*
 
 ## Workspace state file
 
