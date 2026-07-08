@@ -4,47 +4,51 @@ Re-runnable Dynatrace environment-review playbooks, packaged as
 [`aimgr`](https://github.com/dynatrace-oss/ai-config-manager)-installable skills
 and custom agents for GitHub Copilot.
 
-Four playbooks are bundled:
+## Contents
 
-| Playbook | Skill | Agent | Output subfolder |
-| --- | --- | --- | --- |
-| Bizevents / Business Observability overview | `dt-bizevents-review` | `@dt-bizevents-review` | `event-overview-reports/` |
-| Logs overview | `dt-logs-review` | `@dt-logs-review` | `logs-overview-reports/` |
-| Business Process detail | `dt-business-process-review` | `@dt-business-process-review` | `process-detail-reports/` |
-| Business Observability dashboard builder | `dt-business-dashboard-build` | `@dt-business-dashboard-build` | `dashboards/` |
+| Playbook | Agent | Output subfolder |
+| --- | --- | --- |
+| Bizevents / Business Observability overview | `@dt-bizevents-review` | `event-overview-reports/` |
+| Logs overview | `@dt-logs-review` | `logs-overview-reports/` |
+| Business Process detail | `@dt-business-process-review` | `process-detail-reports/` |
+| Business Observability dashboard builder | `@dt-business-dashboard-build` | `dashboards/` |
 
-All four depend on a shared scaffolding skill **`dt-playbook-common`** that
-owns the Step 0 kickoff interview, intent confirmation, empty-tenant fast-path,
-duplicate-snapshot logic, PowerShell quoting, shared report style, and the
-self-improvement protocol.
+All four depend on the shared **`dt-playbook-common`** skill (Step 0 kickoff
+interview, context/folder confirmation, empty-tenant fast-path,
+duplicate-snapshot logic, PowerShell quoting rules, shared report style,
+self-improvement protocol).
 
 ## Prerequisites
 
-| Requirement | Notes |
+| Requirement | Verify with |
 | --- | --- |
-| [`dtctl`](https://github.com/dynatrace-oss/dtctl) installed and on `PATH` | `dtctl version` to verify. Install via Homebrew or `install.ps1` / `install.sh` — aimgr does **not** install the binary, only its operator skill. |
-| [`aimgr`](https://github.com/dynatrace-oss/ai-config-manager) installed | `aimgr --version` to verify |
-| Authenticated `dtctl` context | `dtctl auth login --context <name> --environment "https://<env>.apps.dynatrace.com"` |
+| [`dtctl`](https://github.com/dynatrace-oss/dtctl) on `PATH`, authenticated to at least one context | `dtctl version` · `dtctl ctx current` |
+| [`aimgr`](https://github.com/dynatrace-oss/ai-config-manager) installed | `aimgr --version` |
 
-> The `dtctl` operator skill and the Dynatrace domain skills (`dt-dql-essentials`,
-> `dt-obs-logs`, etc.) are pulled in automatically by the manifest install
-> below — no separate `dtctl skills install` / `npx skills add` step needed.
+`aimgr` does **not** install the `dtctl` binary — install it separately per its
+README. `aimgr` **does** clone the `dtctl` operator skill and all
+`dynatrace-for-ai` domain skills (DQL, observability, platform, migration) into
+its own cache when you run the manifest install below — so if you're using this
+`aimgr` workflow you can skip the alternative install paths documented in the
+`dynatrace-for-ai` and `dtctl` READMEs (`npx skills add …`, `claude plugin
+marketplace add …`, `dtctl skills install`). Those are equivalent, mutually
+exclusive alternatives — pick one, not several.
 
-## Install (one-time per workspace) — manifest one-liner
+## Install (one-time per workspace)
 
-This repo ships an [`ai.repo.yaml`](ai.repo.yaml) manifest that also registers
-the [`dtctl`](https://github.com/dynatrace-oss/dtctl) operator skill and the
+This repo ships an [`ai.repo.yaml`](ai.repo.yaml) that also registers the
+[`dtctl`](https://github.com/dynatrace-oss/dtctl) operator skill and the
 [`dynatrace-for-ai`](https://github.com/Dynatrace/dynatrace-for-ai) domain
-skills (DQL, observability, platform, migration) as aimgr sources.
+skills as `aimgr` sources.
 
 ```powershell
-# 1. Apply the manifest — registers all three repos as aimgr sources
+# 1. Apply the manifest — registers all three source repos
 aimgr repo apply-manifest https://raw.githubusercontent.com/dt-jr25/dt-playbook-skills/main/ai.repo.yaml
 
 # 2. Target GitHub Copilot
 aimgr config set install.targets copilot
 
-# 3. Install everything in one shot (playbook skills + agents + dtctl + dynatrace-for-ai)
+# 3. Install into your workspace
 cd <your-workspace>
 aimgr install "skill/*" "agent/dt-*"
 ```
@@ -52,20 +56,17 @@ aimgr install "skill/*" "agent/dt-*"
 After install, `.github/skills/` and `.github/agents/` are populated with
 symlinks back to the aimgr repo cache.
 
-### Alternative: this repo only
-
-If you don't want the `dtctl` and `dynatrace-for-ai` skills pulled in (e.g. you
-already manage them separately), skip the manifest and add only this repo:
+For predictable upgrades, pin an immutable ref in your local
+`ai.repo.yaml` (edit and re-run `aimgr repo sync`) or, if you only want this
+repo and none of the transitive sources, add it directly with a pinned ref:
 
 ```powershell
 aimgr repo add gh:dt-jr25/dt-playbook-skills --ref v1.0.0
-aimgr config set install.targets copilot
-aimgr install "skill/dt-*" "agent/dt-*"
 ```
 
 ## Run a playbook
 
-In any Copilot chat inside the workspace:
+In any Copilot chat inside the workspace, invoke the agent by name:
 
 ```
 @dt-bizevents-review
@@ -74,46 +75,96 @@ In any Copilot chat inside the workspace:
 @dt-business-dashboard-build
 ```
 
-The agent reads `dt-playbook-common` first (Step 0 interview → context/folder
-confirmation → final intent check), then runs the paired playbook skill end-to-end
-and writes the deliverable to
-`<context-folder>/<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.<ext>`
-(`.md` for the three review playbooks, `.json` for the dashboard builder).
-
-Natural-language invocation also works because each skill's `description` field
-carries trigger keywords:
+Natural-language invocation also works — each skill's `description` carries
+trigger keywords:
 
 > "Run a bizevents overview against my prod context."
-> "Logs overview report for the demo tenant."
-> "Business process detail on the checkout funnel."
-> "Build a business observability dashboard for the claims flow."
+> "Build a Business Observability dashboard for the checkout funnel."
 
-### Chaining playbooks (hand-off)
+Every agent reads `dt-playbook-common` first (Step 0 → context/folder
+confirmation → intent check), then runs the paired skill end-to-end and writes
+the deliverable to
+`<context-folder>/<subfolder>/<stem>-<YYYY-MM-DD-HHMM>.<ext>`
+(`.md` for reviews, `.json` for dashboards).
 
-`dt-business-process-review` and `dt-business-dashboard-build` are designed to
-chain. At the end of a process-review run, the agent offers a one-click
-hand-off to the dashboard builder that carries the resolved scope,
-recommended correlation ID, confirmed business measure + dimension, PII
-exclusions, and process step order forward. The dashboard skill's **hand-off
-mode** consumes those facts and skips every Discovery Query the review
-already answered (§1–§3, and depending on what the review resolved, §4/§5/§7
-too), only running the incremental queries it truly needs — chiefly §8
-(owning-service discovery) for the `simple-kpi` template. This cuts Grail
-scan cost roughly in half on a paired run.
+### Chaining process review → dashboard build
 
-Manual hand-off later (e.g. after reviewing the report):
+At the end of a `@dt-business-process-review` run the agent offers a one-click
+hand-off to `@dt-business-dashboard-build`. A `.handoff.yaml` sidecar carries
+the resolved scope, correlation ID, business measure + dimension, PII
+exclusions, and step order forward; the dashboard agent's hand-off mode skips
+every Discovery Query the review already answered — roughly halving Grail scan
+cost on paired runs.
+
+Manual hand-off later (after reading the report):
 
 ```
 @dt-business-dashboard-build --from-report <context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
 ```
 
-or simply *"Build a Business KPI dashboard from the review at `<path>`."*
+## Common commands (tips & tricks)
+
+### `aimgr` — sources, install, and overrides
+
+| Action | Command |
+| --- | --- |
+| Show current repo state (sources, resource counts, active overrides) | `aimgr repo info` |
+| Print the shareable local manifest | `aimgr repo show-manifest` |
+| List resources known to the aimgr repo | `aimgr repo list` |
+| Re-import from all configured sources | `aimgr repo sync` |
+| Preview a sync without touching anything | `aimgr repo sync --dry-run` |
+| Reconcile stale source-owned resources after include/subpath changes | `aimgr repo sync --prune` |
+| Full soft-reset: clear imported state then re-import from `ai.repo.yaml` | `aimgr repo rebuild` |
+| Temporarily redirect a normally-remote source to a local checkout | `aimgr repo override-source dt-playbook-skills local:C:\path\to\dt-playbook-skills` |
+| Clear an active override (restores the original remote definition + auto-syncs) | `aimgr repo override-source dt-playbook-skills --clear` |
+| Re-apply the shared manifest (picks up ref/URL changes) | `aimgr repo apply-manifest <manifest-url>` |
+| Remove a source and its imported resources | `aimgr repo remove <name>` |
+| Remove a source but keep the files | `aimgr repo remove <name> --keep-resources` |
+| Install everything declared in the current workspace's `ai.package.yaml` | `aimgr install` |
+| Install a specific resource or pattern | `aimgr install skill/dt-bizevents-review` · `aimgr install "skill/dt-*"` |
+| List what's installed in the current workspace | `aimgr list` |
+| Reconcile the workspace with `ai.package.yaml` (fix missing/orphaned installs) | `aimgr repair` |
+| Uninstall from the current workspace | `aimgr uninstall skill/<name>` |
+
+> **Override gotcha #1 — clearing:** `--clear` is mutually exclusive with the
+> `local:/path` argument. Run `aimgr repo override-source <name> --clear` on
+> its own, no path. The error message says so verbatim.
+>
+> **Override gotcha #2 — `apply-manifest` doesn't clear overrides:** an active
+> override always wins over the manifest baseline, so `apply-manifest` can
+> silently mask a stale override and later `repo sync` may reject with a
+> resource-name collision. Always `--clear` first, then `apply-manifest`.
+>
+> **Override gotcha #3 — local-only sources can't be overridden:**
+> `override-source` is only for switching a *remote-backed* source to a local
+> checkout. If a source is already declared as `local:` in `ai.repo.yaml`,
+> edit the manifest directly (or `repo remove` + `repo add`) instead.
+
+### `dtctl` — contexts and query smoke-tests
+
+| Action | Command |
+| --- | --- |
+| List every context (starred = current) | `dtctl ctx` |
+| Show which context is active | `dtctl ctx current` |
+| Switch to another context | `dtctl ctx <name>` |
+| Create a new context and log in via browser OAuth | `dtctl auth login --context <name> --environment "https://<env>.apps.dynatrace.com"` |
+| Re-authenticate the current context after token expiry | `dtctl auth login` |
+| Show OAuth session status | `dtctl auth status` |
+| Health-check config, connectivity, and auth | `dtctl doctor` |
+| Ad-hoc DQL from a here-string (avoids shell quoting) | ``@'...DQL...'@ \| dtctl query -f - -o json`` |
+| Run a DQL query from a file | `dtctl query -f query.dql -o json` |
+| Dry-run to cap Grail cost | append `\| limit 1` and use a small window (e.g. `from:-1h`) |
+
+> **PowerShell quoting:** always use `@'...'@` (single-quoted here-string) when
+> piping DQL to `dtctl query -f -`. Double-quoted here-strings (`@"..."@`)
+> attempt to expand `$` variables in your DQL — that breaks dashboard-variable
+> references like `$Country` or `$CardType` and any string starting with `$`.
 
 ## Workspace state file
 
 Persistent context↔folder mappings live in
 `<workspace-root>/.dt-playbook-mappings.yaml`, created on first run. Do not
-edit by hand while a playbook is running. See `dt-playbook-common`'s
+edit by hand while a playbook is running — see `dt-playbook-common`'s
 *Workspace mapping file* section for the schema.
 
 ## Versioning
@@ -124,15 +175,8 @@ Releases follow semver:
 - **minor** — additive (new query, new report section, new anomaly check).
 - **major** — breaking report-shape change, removed query, renamed skill/agent.
 
-Pin a `--ref` tag in `aimgr repo add` if you want predictable upgrades:
-
-```powershell
-aimgr repo add gh:dt-jr25/dt-playbook-skills --ref v1.0.0
-```
-
 ## Contributing improvements
 
-When a playbook needs a new query, anomaly check, or report section, file a PR
-against this repo. The skills themselves are symlink-installed and read-only
-from any consuming workspace — do not edit `.github/skills/*/SKILL.md` in
-place.
+File a PR against this repo when a playbook needs a new query, anomaly check,
+or report section. Installed skills are symlinked and read-only from consuming
+workspaces — do **not** edit `.github/skills/*/SKILL.md` in place.
