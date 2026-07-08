@@ -615,20 +615,15 @@ Prompt the user via `vscode_askQuestions` with a single question titled *"Build 
 
 Options:
 
-- **📊 Yes — build a Business KPI dashboard now** (recommended when the report focused on ≤ 2 event.types or the Recommended Business Metrics section calls out a single-flow KPI headline) → invoke `@dt-business-dashboard-build` in hand-off mode with template `simple-kpi` pre-selected.
-- **🧭 Yes — build a Process Journey dashboard now** (recommended when the Process Map characterized ≥ 3 ordered steps) → invoke `@dt-business-dashboard-build` in hand-off mode with template `process-journey` pre-selected.
-- **📄 Not yet — just save the report** (recommended when the user still needs to review the findings before committing to a dashboard shape) → do nothing extra. The user can run `@dt-business-dashboard-build --from-report <path>` later.
+- **📊 Yes — build a dashboard now** (recommended when the report produced a clear scope, correlation ID, and at least one measure or dimension worth visualizing) → invoke `@dt-business-dashboard-build` in hand-off mode with the sidecar path pre-loaded. The dashboard skill will then run its own mandatory Step 2 question — **Business** perspective vs **Technical** perspective — and design the layout / tiles / metrics accordingly.
+- **📄 Not yet — just save the report** (recommended when the user still wants to review the findings before committing to a dashboard) → do nothing extra. The user can run `@dt-business-dashboard-build --from-report <path>` later; the sidecar is written either way.
 - **🛑 No thanks** → do nothing.
 
-### Recommended-template heuristic (used to mark one of the two "Yes" options as recommended)
-
-- **Recommend `process-journey`** if the report's Process Map documents ≥ 3 ordered event.types **and** §11 funnel attrition covers ≥ 3 steps with non-trivial volume (≥ ~5/h per step).
-- **Recommend `simple-kpi`** if the report focused on 1–2 event.types, or if the Recommended Business Metrics → Dashboard composition section names a single headline (revenue / order count / success rate).
-- **Present both without a recommendation** if neither heuristic clearly fits — let the user decide.
+> **Do not offer a layout, template, or perspective pick here.** The dashboard skill owns those decisions — the review's job is only to hand off the scope + correlation + measures + dimensions + PII flags. Historical versions of this playbook offered `simple-kpi` vs `process-journey` template picks at this point; that has been removed because it constrained the dashboard skill before it had a chance to interview the user about their audience.
 
 ### What the hand-off carries forward
 
-When the user picks either "Yes", pass the following into the `dt-business-dashboard-build` invocation (either as in-context recall for a same-conversation run, or via `--from-report <path>` if the invocation opens a new agent turn):
+When the user picks "Yes", pass the following into the `dt-business-dashboard-build` invocation (either as in-context recall for a same-conversation run, or via `--from-report <path>` if the invocation opens a new agent turn):
 
 | Field | Source in this report |
 | --- | --- |
@@ -641,7 +636,7 @@ When the user picks either "Yes", pass the following into the `dt-business-dashb
 | PII exclusions | Report §🔒 PII / Sensitive Content Findings |
 | Terminal / start step | Report §🧭 Process Map → 🛣️ Canonical happy path |
 
-See `dt-business-dashboard-build` §Hand-off mode for the receiving side's behaviour (which Discovery Queries it will skip vs. still run, and what user decisions still fire — template confirmation, currency, slug, step labels, and — for `simple-kpi` only — owning-service discovery).
+See `dt-business-dashboard-build` §Step 1 (Resolve scope) for the receiving side's behaviour — it consumes the sidecar directly, skips the discovery queries the review already answered, and then runs its mandatory perspective interview + generative design steps.
 
 ### Structured hand-off packet (mandatory sidecar file)
 
@@ -679,8 +674,9 @@ status_field:   # nullable — only populate if §7 field-coverage matrix surfac
   field: <statusField | null>
   success_literal: <literal | null>
 pii_exclude: [<field1>, <field2>]   # empty list if §15 found nothing
-recommended_template: simple-kpi | process-journey | null   # per the heuristic above; null if neither wins
 ```
+
+> **Removed in v1.1:** `recommended_template` (was `simple-kpi | process-journey`). The dashboard-build skill is now generative and picks its own layout / tile mix based on the perspective the user chooses in its Step 2, so a pre-committed template hint from the review would only constrain the design without adding value. Older sidecars that still carry this key are safe to leave — the dashboard skill treats it as a hint at most.
 
 Rules:
 
