@@ -41,7 +41,7 @@ description: >-
 | `<filename-stem>` | `business-process-detail` |
 | `<records>` (used in fast-path prompts) | `bizevents` |
 | Discovery Query 1 (headline) | §1 below |
-| Initial-overview queries (run when Query 1 > 0) | §2–4 below |
+| Initial-overview queries (run when Query 1 > 0) | §2–4b below (§4b = optional cross-signal presence check) |
 | Bucket-inventory query (empty-tenant fast path) | §16 below |
 | Deep-dive queries (run after Step 2 — focused on selected provider(s)/type(s)) | §5–15 below |
 
@@ -54,6 +54,7 @@ Full output path: `OUTPUT/<context-folder>/reports/business-process-detail-<YYYY
 | Token scopes: read access to `bizevents` (Grail query scopes) | A read-only context (e.g. `*-readonly`) is enough |
 | At least one `event.provider` already present in the tenant | If `bizevents` is empty, fall back to the `dt-bizevents-review` skill's empty-tenant fast path — there is no process to characterize |
 | **`dt-obs-tracing` skill** (from `dynatrace-for-ai`) — recommended | §8 correlation-ID discovery relies on `trace_id` / `span_id` / `dt.trace_id` semantics and — when a bizevent carries a trace id — span-to-service lookups. Loading `dt-obs-tracing` before Step 1 makes those queries correct on the first try. Not strictly required if the tenant's bizevents never carry a trace id, but assume it is required unless proven otherwise. Installed via this repo's `ai.repo.yaml` manifest (see the repo README); if not in the agent's context, follow `dt-playbook-common` §Prerequisites' missing-skill procedure. |
+| **`dt-obs-frontends` + `dt-obs-logs` skills** (from `dynatrace-for-ai`) — recommended when running §4b | The optional cross-signal presence check (§4b) queries `user.events` (RUM) and `logs` alongside `spans`. Correct field names for those signals (`view.name`, `action.name`, `dt.rum.instance.id`, `trace_id` vs `dt.trace_id`, `k8s.workload.name`, etc.) come from these skills — load them before §4b so the probes are correct on the first try. Skip only if you are not running §4b. |
 
 ---
 
@@ -146,6 +147,56 @@ fetch bizevents, from:-1h
 | fieldsSummary event.id, event.category, event.provider, event.type,
                 dt.openpipeline.source, dt.openpipeline.pipelines, dt.system.bucket
 ```
+
+### 4b. Cross-signal presence check (optional but strongly recommended — RUM, spans, logs)
+
+> **Why this matters.** A business process is rarely bizevents-only. The same withdrawal / checkout / login almost always *also* surfaces as a RUM user action (`user.events`), a distributed trace (`spans`), and backend log lines (`logs`). bizevents alone under-describe the flow, and — more importantly for a BO consultant — the **correlation health *between* signals** is one of the highest-value findings this playbook can produce (e.g. RUM events carrying no `trace.id`, logs carrying no `dt.trace_id`, so the front-end journey can't be joined to the backend trace). The bizevents-only Discovery Set (§1–§4, §5–§15) will never surface these gaps on its own.
+>
+> **When to run.** During Step 1 (overview), once you know roughly which application / endpoint the process touches (e.g. a `withdraw` keyword and a `/…/withdraw` path fragment). These are breadth probes — keep them at 1 h and low `limit`. Skip an individual probe only if the tenant provably has no data of that signal type (check `dt.system.bucket` inventory / `fetch` returns zero).
+>
+> **Prerequisites.** Correct field names for each signal come from the `dt-obs-frontends` (RUM), `dt-obs-tracing` (spans), and `dt-obs-logs` (logs) skills from `dynatrace-for-ai`. Load them if not already in context — the field names below are directional and vary by tenant instrumentation. Substitute `<processKeyword>` (e.g. `withdraw`) and `<endpointPathFragment>` (e.g. `/broker-service/v1/balance`) inline.
+
+```dql
+// RUM: does the process appear as a user action / view / XHR — and does it carry a trace id?
+fetch user.events, from:-1h
+| filter contains(view.name, "<processKeyword>")
+       or contains(action.name, "<processKeyword>")
+       or contains(http.url, "<endpointPathFragment>")
+| summarize events = count(),
+            distinctSessions = countDistinct(dt.rum.instance.id),
+            withTraceId      = countIf(isNotNull(trace.id)),
+            by:{event.type}
+| sort events desc
+| limit 25
+```
+
+```dql
+// Spans: is there a distributed trace for the process endpoint, and which services + DBs does it touch?
+fetch spans, from:-1h
+| filter contains(request.path, "<endpointPathFragment>")
+       or contains(endpoint.name, "<processKeyword>")
+| summarize spans = count(),
+            traces   = countDistinct(trace.id),
+            services = countDistinct(service.name),
+            p95Ms    = percentile(duration, 95) / 1000000.0,
+            by:{service.name, span.name}
+| sort spans desc
+| limit 25
+```
+
+```dql
+// Logs: backend log lines for the process — and are they trace-correlated?
+fetch logs, from:-1h
+| filter contains(content, "<processKeyword>")
+| summarize lines = count(),
+            withTraceId = countIf(isNotNull(trace_id) or isNotNull(dt.trace_id)),
+            workloads   = countDistinct(k8s.workload.name),
+            by:{loglevel}
+| sort lines desc
+| limit 25
+```
+
+> **Interpret as a cross-signal correlation-health matrix.** For each of the four signals (bizevents, RUM, spans, logs) record: is the process present? which correlation key(s) does it carry (`trace.id`, `dt.rum.instance.id`, `session.id`, business IDs)? and which keys are **shared** with the adjacent signal. The headline finding is usually a *broken bridge* — e.g. RUM ↔ backend joins only on a fuzzy `businessId + amount + time` match because RUM has no `trace.id` and backend has no `session.id`. Capture this in the new report section (see *Output Document Structure → Cross-Signal Presence & Correlation Health*), and feed any broken bridge into *Misses, Precautions & Anomalies* with a concrete fix (inject `trace.id` onto RUM events, or mint a single `<processId>` stamped on every signal).
 
 ---
 
@@ -274,6 +325,24 @@ Then aggregate to discover the most common sequences:
 ```
 
 > Use the top-N sequences to draw the *canonical happy path* and any *common branches* (e.g. happy-path vs. fraud-branch) in the report's Process Map section.
+
+> ⚠️ **DQL-build fallback — if `collectArray` + `concatArray`/`arrayToString` errors with `TOO_MANY_POSITIONAL_PARAMETERS_WITH_OPTIONS`.** Some Grail/DQL builds reject the `concatArray(array, " → ")` / `arrayToString(array, sep)` positional-with-options form used in the second query above. When that happens, drop the sequence-string aggregation entirely and characterize ordering with a per-correlation **overlap** summary instead — which distinct steps co-occur under one correlation ID, plus the first and last step — then reconstruct the canonical order by hand from the transition matrix (§10):
+>
+> ```dql
+> fetch bizevents, from:-24h
+> | filter in(event.provider, {<providers>}) and in(event.type, {<eventTypes>})
+> | filter isNotNull(<bestCorrelationIdField>)
+> | summarize stepsTouched = countDistinct(event.type),
+>             firstStep    = takeFirst(event.type, sort:{timestamp asc}),
+>             lastStep     = takeFirst(event.type, sort:{timestamp desc}),
+>             by:{corrId = <bestCorrelationIdField>}
+> | summarize correlations = count(),
+>             by:{stepsTouched, firstStep, lastStep}
+> | sort correlations desc
+> | limit 25
+> ```
+>
+> This yields the same happy-path signal (dominant `firstStep → … → lastStep` with full `stepsTouched`) without the array-to-string step. Record in the report that the sequence-string form was unavailable and this overlap form was used, so the next agent knows which pattern this tenant's DQL build supports.
 
 ### 10. Step-to-step transition matrix (24 h)
 
@@ -430,6 +499,12 @@ Map findings into the report sections using this checklist.
 - ❌ **Decoy correlator** — looks promising (matches the naming convention) but in practice each step has its own value (so `stepsTouched == 1` dominates). Call it out explicitly so consumers don't try to join on it.
 - 🪪 **Naming inconsistencies** — same business concept under multiple keys (`orderId` vs `order.id` vs `orderNumber`). Capture all variants and recommend a `coalesce()` pattern.
 
+### Cross-signal correlation health (from §4b)
+- 🌐 **Signal coverage** — for each of bizevents / RUM / spans / logs, state present vs. absent for this process, with the 1 h volume from §4b. A process present in only one signal is a coverage gap worth flagging (e.g. no backend trace means no service-level timing).
+- 🔗 **Shared keys between signals** — tabulate which correlation key each signal carries (`trace.id`, `dt.rum.instance.id`, `session.id`, business IDs) and which are shared with the adjacent signal. This is what determines whether the front-end journey can be joined to the backend trace.
+- 🚧 **Broken bridge** — the highest-value finding: a signal boundary with **no shared key** (e.g. RUM has `dt.rum.instance.id` but no `trace.id`; backend has `trace.id` but no `session.id`, forcing a fuzzy `businessId + amount + time` join). Recommend a concrete fix: inject `trace.id` onto RUM events, or mint one `<processId>` stamped on every signal.
+- 🪵 **Un-correlated logs** — logs where `trace_id` / `dt.trace_id` is null on ≥ some share of process lines. Flag because those logs can't be pivoted from a trace or a bizevent during incident triage.
+
 ### Misses, precautions, things to note
 - 🚨 **Missing terminal step** — selected types include a "started" event but no clear "completed" event. The process can't be measured for completion rate without one.
 - 🚨 **Missing failure / exception step** — only happy-path events selected, with no equivalent failure branch. Operators cannot tell failed processes from stalled ones.
@@ -507,6 +582,12 @@ Section skeleton:
    ### 🌿 Common branches
        - One sub-section per branch (fraud, refund, cancel, retry…) with its own diagram fragment and share.
    ### 🔁 Loop / retry behaviour (if any)
+
+## 🌐 Cross-Signal Presence & Correlation Health
+   > Only when §4b was run. Omit if the process is provably bizevents-only.
+   - Coverage matrix: rows = bizevents / RUM / spans / logs; columns = present? · 1 h volume · correlation key(s) carried.
+   - Shared-key map: which key bridges each adjacent signal boundary (or "none — fuzzy match only").
+   - Call out the strongest end-to-end joinability story and any **broken bridge** (feed the fix into Misses below).
 
 ## 📘 Per-Event Data Dictionary
    - One sub-table per `event.type` from the scope.
