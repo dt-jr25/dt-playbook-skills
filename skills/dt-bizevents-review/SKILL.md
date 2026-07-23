@@ -10,7 +10,7 @@ description: >-
   "what business events are we collecting", or @dt-bizevents-review. Reads
   `dt-playbook-common` FIRST for Step 0 (context/folder confirmation, intent
   check, empty-tenant fast-path). Writes to
-  `<context-folder>/event-overview-reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md`.
+  `OUTPUT/<context-folder>/reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md`.
   Do NOT use for explaining an existing query, business-process / funnel
   deep-dives (use `dt-business-process-review`), or log analysis (use
   `dt-logs-review`).
@@ -19,7 +19,7 @@ description: >-
 # 📓 Bizevents Environment Review — Playbook
 
 > **Purpose:** Re-runnable recipe for producing a high-level bizevents state-of-the-environment report (data dictionary, anomalies, correlation IDs, metric opportunities) for any Dynatrace tenant.
-> **Sibling output:** `<context-folder>/event-overview-reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md` (e.g. `demo-live-readonly/event-overview-reports/bizevents-overview-2026-06-25-1820.md`).
+> **Sibling output:** `OUTPUT/<context-folder>/reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md` (e.g. `OUTPUT/demo-live-readonly/reports/bizevents-overview-2026-06-25-1820.md`).
 > **Audience:** AI coding agents (Copilot, Claude, etc.) and the engineer driving them.
 
 > 📖 **Read the `dt-playbook-common` skill first.** It owns the prerequisites, the Step 0 kickoff interview, intent confirmation, the per-workspace `.dt-playbook-mappings.yaml`, empty-tenant fast-path conventions, duplicate-snapshot logic, PowerShell quoting note, shared report style rules, and the self-improvement protocol. This skill only contains what is unique to bizevents.
@@ -30,7 +30,7 @@ description: >-
 
 | Parameter | Value |
 | --- | --- |
-| `<subfolder>` | `event-overview-reports/` |
+| `<kind>` | `reports/` |
 | `<filename-stem>` | `bizevents-overview` |
 | `<records>` (used in fast-path prompts) | `bizevents` |
 | Discovery Query 1 (headline) | §1 below |
@@ -38,7 +38,7 @@ description: >-
 | Bucket-inventory query (empty-tenant fast path) | §10 below |
 | Deep-dive queries (run after Step 2) | §7–9 below |
 
-Full output path: `<context-folder>/event-overview-reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md` (UTC, never overwritten).
+Full output path: `OUTPUT/<context-folder>/reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md` (UTC, never overwritten).
 
 ### Extra prerequisites (beyond `dt-playbook-common`)
 
@@ -194,7 +194,7 @@ Map findings to the report sections using this checklist.
 
 ## 🧱 Output Document Structure
 
-Save to `<context-folder>/event-overview-reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md` (UTC). See the `dt-playbook-common` skill's *Shared style rules* section for filename/overwrite rules.
+Save to `OUTPUT/<context-folder>/reports/bizevents-overview-<YYYY-MM-DD-HHMM>.md` (UTC). See the `dt-playbook-common` skill's *Shared style rules* section for filename/overwrite rules.
 
 Section skeleton:
 

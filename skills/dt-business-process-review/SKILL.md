@@ -12,7 +12,7 @@ description: >-
   "business process metrics", or @dt-business-process-review. Reads
   `dt-playbook-common` FIRST for Step 0, then runs a two-part Step 2 (pick
   providers, pick event.types) before deep-dive queries. Writes to
-  `<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md`.
+  `OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.md`.
   After the report is saved, offers a one-click hand-off to
   `dt-business-dashboard-build` that carries the resolved scope, correlation
   ID, measure/dimension picks, and PII flags forward so the dashboard skill
@@ -24,7 +24,7 @@ description: >-
 # 🧬 Business Process Review — Playbook
 
 > **Purpose:** Re-runnable recipe for producing a *focused* business-process deep-dive report — given one or more `event.provider`s and a chosen set of `event.type`s, characterize how those events **mesh together to form a process**, surface the correlation IDs that stitch the steps, flag the misses / precautions, and recommend **business-focused** metrics at both the process level and the per-event level.
-> **Sibling output:** `<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md` (e.g. `busobs-prod-readonly/process-detail-reports/business-process-detail-2026-06-25-2140.md`).
+> **Sibling output:** `OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.md` (e.g. `OUTPUT/busobs-prod-readonly/reports/business-process-detail-2026-06-25-2140.md`).
 > **Audience:** AI coding agents (Copilot, Claude, etc.) and the engineer driving them.
 
 > 📖 **Read the `dt-playbook-common` skill first.** It owns the prerequisites, the Step 0 kickoff interview, intent confirmation, the per-workspace `.dt-playbook-mappings.yaml`, empty-tenant fast-path conventions, duplicate-snapshot logic, PowerShell quoting note, shared report style rules, and the self-improvement protocol. This skill only contains what is unique to the business-process review.
@@ -37,7 +37,7 @@ description: >-
 
 | Parameter | Value |
 | --- | --- |
-| `<subfolder>` | `process-detail-reports/` |
+| `<kind>` | `reports/` |
 | `<filename-stem>` | `business-process-detail` |
 | `<records>` (used in fast-path prompts) | `bizevents` |
 | Discovery Query 1 (headline) | §1 below |
@@ -45,7 +45,7 @@ description: >-
 | Bucket-inventory query (empty-tenant fast path) | §16 below |
 | Deep-dive queries (run after Step 2 — focused on selected provider(s)/type(s)) | §5–15 below |
 
-Full output path: `<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md` (UTC, never overwritten).
+Full output path: `OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.md` (UTC, never overwritten).
 
 ### Extra prerequisites (beyond `dt-playbook-common`)
 
@@ -487,7 +487,7 @@ fetch bizevents, from:-24h
 
 ## 🧱 Output Document Structure
 
-Save to `<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md` (UTC). See the `dt-playbook-common` skill's *Shared style rules* section for filename/overwrite rules.
+Save to `OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.md` (UTC). See the `dt-playbook-common` skill's *Shared style rules* section for filename/overwrite rules.
 
 Section skeleton:
 
@@ -610,7 +610,7 @@ Prompt the user via `vscode_askQuestions` with a single question titled *"Build 
 > Confirmed business measure: <measureField>  (from §14)
 > Confirmed category dimension: <dimensionField>  (from §14)
 > PII fields to exclude from any tile: [<field1>, <field2>, …]  (from §15)
-> Report path (for hand-off): <context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
+> Report path (for hand-off): OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
 ```
 
 Options:
@@ -643,7 +643,7 @@ See `dt-business-dashboard-build` §Step 1 (Resolve scope) for the receiving sid
 On **every non-empty-scope run** — regardless of whether the user picks a "Yes" or "Not yet" hand-off option — write a small YAML sidecar next to the markdown report:
 
 ```
-<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.handoff.yaml
+OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.handoff.yaml
 ```
 
 The packet is the **canonical machine-readable hand-off contract** between this skill and `dt-business-dashboard-build`. The dashboard skill reads it directly (fast path) instead of re-parsing the markdown report; without it, the dashboard skill has to grep the report for each field, which is slow and brittle. Same UTC minute-stamp as the report so a report + packet pair always share a suffix.

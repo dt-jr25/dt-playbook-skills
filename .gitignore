@@ -60,10 +60,14 @@ ai.package.yaml
 .dt-playbook-mappings.yaml
 .vscode/
 
-# Context folders created by the review playbooks. The naming convention is
-# "<tenant>-<env>-<safety>/" (e.g. acme-prod-readonly/, demo-live-readonly/).
-# Match the common safety suffixes so teammates can run playbooks against
-# their own tenants without accidentally committing reports.
+# All generated playbook output lives under a single OUTPUT/ root, one
+# subfolder per dtctl context, each with reports/ and dashboards/. Ignoring the
+# root keeps every tenant report, dashboard, and handoff sidecar out of git.
+OUTPUT/
+
+# Legacy context folders created by older playbook versions at the repo root.
+# The naming convention is "<tenant>-<env>-<safety>/" (e.g. acme-prod-readonly/,
+# demo-live-readonly/). Kept so pre-OUTPUT/ workspaces don't leak reports.
 *-readonly/
 *-readwrite-mine/
 *-readwrite-all/
@@ -74,12 +78,13 @@ ai.package.yaml
 *-staging/
 *-playground/
 
-# Sub-directories written by the playbooks (belt + braces — the parent
-# context folder is already ignored above).
+# Sub-directories written by older playbook versions (belt + braces — OUTPUT/
+# and the legacy context folders above already cover current + past output).
 event-overview-reports/
 logs-overview-reports/
 process-detail-reports/
 dashboards/
+reports/
 
 # -----------------------------------------------------------------------------
 # Node / npx (needed for `npx skills add ...` if a teammate uses that path)

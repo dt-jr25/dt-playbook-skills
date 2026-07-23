@@ -1,7 +1,7 @@
 ---
 name: dt-business-dashboard-build
 description: >-
-  Generative Dynatrace Business Observability dashboard builder. Given a business-process scope (from a `dt-business-process-review` sidecar or user-supplied), produces a bespoke, process-focused Dashboard JSON for the Dynatrace Dashboards app (`version` 20+). The agent freely chooses the layout, visualization types, tile mix, and metrics — constrained by four hard guardrails: (1) no PII fields on any tile, (2) never imports to the tenant (user imports manually via UI), (3) built from either a **business** or **technical** perspective the user picks, (4) ≤ 15 data tiles (header/markdown tiles are unlimited). Every tile's DQL is validated with a `dtctl query` dry-run before the file is written. Writes to `<context-folder>/dashboards/<slug>-dashboard-<YYYY-MM-DD-HHMM>.json`. Reads `dt-playbook-common` FIRST for Step 0 (context/folder confirmation, intent check). Companion to `dt-bizevents-review` (inventory) and `dt-business-process-review` (funnel deep-dive).
+  Generative Dynatrace Business Observability dashboard builder. Given a business-process scope (from a `dt-business-process-review` sidecar or user-supplied), produces a bespoke, process-focused Dashboard JSON for the Dynatrace Dashboards app (`version` 20+). The agent freely chooses the layout, visualization types, tile mix, and metrics — constrained by four hard guardrails: (1) no PII fields on any tile, (2) never imports to the tenant (user imports manually via UI), (3) built from either a **business** or **technical** perspective the user picks, (4) ≤ 15 data tiles (header/markdown tiles are unlimited). Every tile's DQL is validated with a `dtctl query` dry-run before the file is written. Writes to `OUTPUT/<context-folder>/dashboards/<slug>-dashboard-<YYYY-MM-DD-HHMM>.json`. Reads `dt-playbook-common` FIRST for Step 0 (context/folder confirmation, intent check). Companion to `dt-bizevents-review` (inventory) and `dt-business-process-review` (funnel deep-dive).
 ---
 
 # 📊 Business Observability Dashboard Builder
@@ -56,7 +56,7 @@ If any skill above is not in your context by the point in the flow where it's ne
 The skill accepts scope from three sources, in order of preference:
 
 1. **Sidecar hand-off** (recommended, produced by `dt-business-process-review`) — a YAML file at
-   `<context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.handoff.yaml`
+   `OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.handoff.yaml`
    alongside the paired markdown report. This is the richest source and skips most of Step 1.
 2. **Report path** — the user names a `business-process-detail-*.md` explicitly (e.g. `--from-report <path>`). The agent looks for a sidecar next to it; if absent, extracts scope from the report body.
 3. **Fresh interview** — no prior review. The agent runs a minimal Step 1 to establish providers, event types, and correlation.
@@ -88,7 +88,7 @@ Read `dt-playbook-common` and execute its Step 0 verbatim:
 - Mappings file lookup (`.dt-playbook-mappings.yaml`).
 - `dtctl auth whoami`.
 - Context/folder interview (single-click accept if the mapping already exists).
-- Folder creation for `<context-folder>/dashboards/` if it doesn't exist.
+- Folder creation for `OUTPUT/<context-folder>/dashboards/` if it doesn't exist.
 - Mappings file update.
 - **Final intent confirmation** — fires on every run, even when hand-off mode is active.
 
@@ -98,7 +98,7 @@ Skill-specific parameters passed to `dt-playbook-common`:
 
 | Parameter | Value |
 | --- | --- |
-| `<subfolder>` | `dashboards/` |
+| `<kind>` | `dashboards/` |
 | `<filename-stem>` | `<process_slug>-dashboard` (e.g. `deposit-lifecycle-dashboard`) |
 | `<records>` | `bizevents` |
 
@@ -263,7 +263,7 @@ Do not batch these into a single `dtctl` call; run one dry-run per tile so failu
 Path (per `dt-playbook-common`):
 
 ```
-<context-folder>/dashboards/<process_slug>-dashboard-<YYYY-MM-DD-HHMM>.json
+OUTPUT/<context-folder>/dashboards/<process_slug>-dashboard-<YYYY-MM-DD-HHMM>.json
 ```
 
 - Filename uses UTC minute-precision. Collision → bump to next minute or append seconds. **Never overwrite.**

@@ -19,7 +19,7 @@ The per-data-source skill supplies:
 
 | Per-skill parameter | Example (`dt-bizevents-review`) | Example (`dt-logs-review`) |
 | --- | --- | --- |
-| `<subfolder>` | `event-overview-reports/` | `logs-overview-reports/` |
+| `<kind>` | `reports/` | `reports/` |
 | `<filename-stem>` | `bizevents-overview` | `logs-overview` |
 | Discovery Query 1 (headline) | bizevents Query 1 | logs Query 1 |
 | Bucket-inventory query | bizevents Query 10 | logs Query 12 |
@@ -30,8 +30,15 @@ The per-data-source skill supplies:
 The full output path is always:
 
 ```
-<context-folder>/<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.md
+OUTPUT/<context-folder>/<kind>/<filename-stem>-<YYYY-MM-DD-HHMM>.md
 ```
+
+- **`OUTPUT/`** is a fixed workspace-root directory that holds *all* generated
+  artifacts for every context. The agent prepends it automatically — it is **not**
+  stored in the mapping file.
+- **`<context-folder>`** equals the `dtctl` context name (see the mapping file).
+- **`<kind>`** is `reports/` for every `.md` review playbook and `dashboards/` for the
+  dashboard builder (`.json`). It replaces the old per-skill subfolders.
 
 Everything else lives below.
 
@@ -45,7 +52,7 @@ Everything else lives below.
 | Authenticated context for the target tenant | `dtctl auth whoami` to confirm; switch with `dtctl ctx use <name>` |
 | **`dtctl` operator skill** (from the `dtctl` repo) | Non-optional. Teaches the agent the exact `dtctl` verbs, flags, `--agent` envelope, output shape, and PowerShell quoting caveats — so it doesn't shell out to `dtctl` from memory. Installed via this repo's `ai.repo.yaml` manifest (see the repo README). |
 | **`dt-dql-essentials` skill** (from `dynatrace-for-ai`) | Non-optional. Every Discovery Query in every playbook is DQL. Installed via this repo's `ai.repo.yaml` manifest (see the repo README). |
-| A target context folder in the workspace (e.g. `dt-playground-readonly/`, `<client>-sprint-readonly/`) | Folder name must match the `dtctl` context name. Reports live in `<context-folder>/<subfolder>/` per the skill. |
+| A target context folder in the workspace (e.g. `dt-playground-readonly/`, `<client>-sprint-readonly/`) | Folder name must match the `dtctl` context name. Reports live in `OUTPUT/<context-folder>/<kind>/` per the skill. |
 
 > 📚 **Read the `dtctl` operator skill AND `dt-dql-essentials` before Step 1 fires.** The host agent's routing model may not auto-load them from the catalog once it's already executing inside a `@dt-*-review` agent — name them explicitly in your read list. Skipping either is the single biggest cause of the agent shelling out with wrong `dtctl` flags or writing invalid DQL.
 
@@ -69,7 +76,7 @@ Persistent `<dtctl context> → <context-folder>` pairings live in
 of which output folder to use for a given tenant. It is workspace-local —
 each workspace tracks its own mappings — and is shared across all `dt-*-review`
 skills (the same context maps to the same folder regardless of which data
-source is being reviewed; only the `<subfolder>` differs).
+source is being reviewed; only the `<kind>` — `reports/` vs `dashboards/` — differs).
 
 ### File location
 
@@ -91,7 +98,7 @@ Field rules:
 
 - **`context`** — exact `dtctl` context name. Primary key. One row per context.
 - **`environment_url`** — apps URL of the target tenant. Sourced from `dtctl auth whoami` on creation; do not invent.
-- **`folder`** — workspace-relative folder path (trailing slash). Defaults to `<context>/` for brand-new contexts.
+- **`folder`** — workspace-relative context-folder name (trailing slash), **without** the `OUTPUT/` prefix — the agent prepends `OUTPUT/` at write time. Defaults to `<context>/` for brand-new contexts.
 - **`last_used_utc`** — ISO-8601 UTC timestamp of the most recent run that used this mapping.
 - **`last_data_source`** — `bizevents` | `logs` | `business-process`. Helps with cross-skill audits.
 
@@ -125,7 +132,7 @@ by interviewing the user. **No `dtctl query` calls run until Step 0 is complete.
      - **🔄 Switch to a different existing context** — show the contexts known from the mappings file as sub-options. If picked, run `dtctl ctx use <name>` followed by `dtctl auth whoami` to confirm.
      - **➕ Create a new context (authenticate a new tenant)** → go to **Step 3a** below before continuing.
      - **🛑 Cancel** → stop the playbook, no queries executed.
-   - **"Which workspace context folder should the report be written to?"** — recommend the folder paired to the chosen context in the mappings file. **If the chosen context has no row in the mappings file (i.e. it is a brand-new context, including one just created via Step 3a), the default folder name MUST equal the context name verbatim** (e.g. context `acme-prod-readonly` → folder `acme-prod-readonly/`). The user can override, but do not invent a different name from the tenant short-id. The agent always appends `<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.md` automatically using the per-data-source skill's parameters — **do not prompt for the subfolder or filename**, and do not overwrite an existing file.
+   - **"Which workspace context folder should the report be written to?"** — recommend the folder paired to the chosen context in the mappings file. **If the chosen context has no row in the mappings file (i.e. it is a brand-new context, including one just created via Step 3a), the default folder name MUST equal the context name verbatim** (e.g. context `acme-prod-readonly` → folder `acme-prod-readonly/`). The user can override, but do not invent a different name from the tenant short-id. The agent always writes under `OUTPUT/<context-folder>/` and appends `<kind>/<filename-stem>-<YYYY-MM-DD-HHMM>.md` automatically using the per-data-source skill's parameters (`<kind>` = `reports/` for reviews, `dashboards/` for the dashboard builder) — **do not prompt for the `OUTPUT/` prefix, the `<kind>` folder, or the filename**, and do not overwrite an existing file.
 
 #### Step 3a — Optional: create a new `dtctl` context
 
@@ -169,13 +176,13 @@ Only run this step if the user picked **"Create a new context"** in step 3. The 
 
 6. **If the user cancels or `dtctl auth login` fails.** Do not write a partial mapping entry. Return to step 3 and let the user pick a different option.
 
-4. **Create both folders if they don't exist yet.** After the user confirms the context-folder name, check whether `<workspace-root>/<context-folder>/` and `<workspace-root>/<context-folder>/<subfolder>/` exist. If either is missing, create it before writing the report — use the workspace file tool (e.g. `create_directory`) or a write tool that auto-creates parent directories. Do not fail the run because the folder is new; new contexts are expected to produce new folders.
+4. **Create both folders if they don't exist yet.** After the user confirms the context-folder name, check whether `<workspace-root>/OUTPUT/<context-folder>/` and `<workspace-root>/OUTPUT/<context-folder>/<kind>/` exist (`<kind>` = `reports/` or `dashboards/`). If either is missing, create it before writing the report — use the workspace file tool (e.g. `create_directory`) or a write tool that auto-creates parent directories. Do not fail the run because the folder is new; new contexts are expected to produce new folders.
 5. **Persist the answer.** After the user confirms both values, the agent MUST update `<workspace-root>/.dt-playbook-mappings.yaml` so future runs auto-recommend the same pairing. Follow the schema and rules in the *Workspace mapping file* section above. If the file does not exist, create it with `version: 1` and a single-entry `mappings:` list.
 6. **🛑 Final intent confirmation (mandatory — fires every run, even when the mapping is already known).** Before any `dtctl query` call, summarize the resolved target back to the user and require explicit go-ahead. Use `vscode_askQuestions` with a single yes/no question titled something like *"Confirm target environment before querying"* and a message body that contains, on separate lines:
 
    - **Context:** `<dtctl context name>`
    - **Environment URL:** `<value from dtctl auth whoami>`
-   - **Report destination:** `<context-folder>/<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.md`
+   - **Report destination:** `OUTPUT/<context-folder>/<kind>/<filename-stem>-<YYYY-MM-DD-HHMM>.md`
    - **Windows to be queried:** last 24 h (initial), expanding to 7 d / 30 d / 90 d only via the empty-tenant fast path
 
    Options:
@@ -189,7 +196,7 @@ Only run this step if the user picked **"Create a new context"** in step 3. The 
 
 #### Prior completed-report check (before running Query 1)
 
-Before firing Query 1, list existing `<filename-stem>-*.md` files in the target report subfolder (`<context-folder>/<subfolder>/`). If the most recent file is **not** an empty-tenant report **and** was written **today (same UTC date)**, surface it and ask the user:
+Before firing Query 1, list existing `<filename-stem>-*.md` files in the target report folder (`OUTPUT/<context-folder>/reports/`). If the most recent file is **not** an empty-tenant report **and** was written **today (same UTC date)**, surface it and ask the user:
 
 > *"A completed `<filename-stem>` report already exists from `<HH:MM UTC>` today (`<filename>`). Do you want to re-run the full playbook, or work from the existing report?"*
 
@@ -199,7 +206,7 @@ Present the options via `vscode_askQuestions`:
 - **🛑 Cancel** → stop.
 
 Skip this check entirely if:
-- No prior report file exists in the subfolder, or
+- No prior report file exists in the folder, or
 - The most recent file was written on a **different UTC date** (re-running a fresh day's playbook is expected and should not be gated).
 
 ---
@@ -231,7 +238,7 @@ The goal is to confirm "no `<records>` are being captured" in 2–3 queries inst
 
 #### Duplicate-snapshot check (before writing an empty-tenant report)
 
-Before writing the empty-tenant report, list existing `<filename-stem>-*.md` files in the target report subfolder (`<context-folder>/<subfolder>/`). If the most recent one is **also** an empty-tenant report (zero-row verdict) **and** less than 24 h old, ask the user:
+Before writing the empty-tenant report, list existing `<filename-stem>-*.md` files in the target report folder (`OUTPUT/<context-folder>/reports/`). If the most recent one is **also** an empty-tenant report (zero-row verdict) **and** less than 24 h old, ask the user:
 
 > *"An empty-tenant snapshot already exists from `<HH:MM UTC>` today with the same verdict. Should I skip writing a duplicate, append a one-line note to that file, or write a fresh timestamped report anyway?"*
 
@@ -284,7 +291,7 @@ The per-data-source skill owns the section skeleton, but every report produced b
 - Avoid timing claims ("takes 5 min"). State volumes + windows precisely.
 - **Never paste raw PII / secrets / customer identifiers** into the report — paraphrase or redact (`a***@example.com`, `41XX-XXXX-XXXX-1234`).
 - Filename uses **UTC** minute-precision (`-<YYYY-MM-DD-HHMM>`). If a file with that exact minute already exists, bump to the next minute or append seconds — never overwrite.
-- Reports live under `<context-folder>/<subfolder>/`, never directly in the context-folder root.
+- Reports live under `OUTPUT/<context-folder>/<kind>/` (`reports/` or `dashboards/`), never directly in the context-folder root or the `OUTPUT/` root.
 
 ---
 
@@ -297,7 +304,7 @@ Manual override (if the user wants to skip the interview):
 ```powershell
 dtctl ctx use <other-context>
 dtctl auth whoami   # confirm
-# then invoke the agent; the agent appends /<subfolder>/<filename-stem>-<YYYY-MM-DD-HHMM>.md automatically
+# then invoke the agent; the agent writes to OUTPUT/<context-folder>/<kind>/<filename-stem>-<YYYY-MM-DD-HHMM>.md automatically
 ```
 
 The agent should always **re-run all queries** for the new environment rather than copying numbers — every tenant has different emitters, providers, and quirks.

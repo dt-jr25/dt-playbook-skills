@@ -10,7 +10,7 @@ description: >-
   "noisy log emitters", "logs PII audit", or @dt-logs-review. Reads
   `dt-playbook-common` FIRST for Step 0 (context/folder confirmation, intent
   check, empty-tenant fast-path). Writes to
-  `<context-folder>/logs-overview-reports/logs-overview-<YYYY-MM-DD-HHMM>.md`.
+  `OUTPUT/<context-folder>/reports/logs-overview-<YYYY-MM-DD-HHMM>.md`.
   Uses 1-in-1000 sampling on 24 h discovery queries to cap Grail scan cost.
   Do NOT use for explaining an existing query, bizevents analysis (use
   `dt-bizevents-review`), or trace/span analysis (use `dt-obs-tracing`).
@@ -19,7 +19,7 @@ description: >-
 # 📜 Logs Environment Review — Playbook
 
 > **Purpose:** Re-runnable recipe for producing a high-level logs state-of-the-environment report (volume, emitters, severity mix, data dictionary, anomalies, correlation IDs, parsing/metric opportunities) for any Dynatrace tenant.
-> **Sibling output:** `<context-folder>/logs-overview-reports/logs-overview-<YYYY-MM-DD-HHMM>.md` (e.g. `demo-live-readonly/logs-overview-reports/logs-overview-2026-06-25-2015.md`).
+> **Sibling output:** `OUTPUT/<context-folder>/reports/logs-overview-<YYYY-MM-DD-HHMM>.md` (e.g. `OUTPUT/demo-live-readonly/reports/logs-overview-2026-06-25-2015.md`).
 > **Audience:** AI coding agents (Copilot, Claude, etc.) and the engineer driving them.
 
 > 📖 **Read the `dt-playbook-common` skill first.** It owns the prerequisites, the Step 0 kickoff interview, intent confirmation, the per-workspace `.dt-playbook-mappings.yaml`, empty-tenant fast-path conventions, duplicate-snapshot logic, PowerShell quoting note, shared report style rules, and the self-improvement protocol. This skill only contains what is unique to logs.
@@ -30,7 +30,7 @@ description: >-
 
 | Parameter | Value |
 | --- | --- |
-| `<subfolder>` | `logs-overview-reports/` |
+| `<kind>` | `reports/` |
 | `<filename-stem>` | `logs-overview` |
 | `<records>` (used in fast-path prompts) | `logs` |
 | Discovery Query 1 (headline) | §1 below |
@@ -38,7 +38,7 @@ description: >-
 | Bucket-inventory query (empty-tenant fast path) | §12 below |
 | Deep-dive queries (run after Step 2) | §8–11 below |
 
-Full output path: `<context-folder>/logs-overview-reports/logs-overview-<YYYY-MM-DD-HHMM>.md` (UTC, never overwritten).
+Full output path: `OUTPUT/<context-folder>/reports/logs-overview-<YYYY-MM-DD-HHMM>.md` (UTC, never overwritten).
 
 ### Extra prerequisites (beyond `dt-playbook-common`)
 
@@ -387,7 +387,7 @@ Map findings to the report sections using this checklist.
 
 ## 🧱 Output Document Structure
 
-Save to `<context-folder>/logs-overview-reports/logs-overview-<YYYY-MM-DD-HHMM>.md` (UTC). See the `dt-playbook-common` skill's *Shared style rules* section for filename/overwrite rules.
+Save to `OUTPUT/<context-folder>/reports/logs-overview-<YYYY-MM-DD-HHMM>.md` (UTC). See the `dt-playbook-common` skill's *Shared style rules* section for filename/overwrite rules.
 
 Section skeleton:
 

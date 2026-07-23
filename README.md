@@ -6,13 +6,13 @@ and custom agents for GitHub Copilot.
 
 ## Contents
 
-| Playbook | Agent | Output subfolder |
+| Playbook | Agent | Output location |
 | --- | --- | --- |
-| Bizevents / Business Observability overview | `@dt-bizevents-review` | `event-overview-reports/` |
-| Logs overview | `@dt-logs-review` | `logs-overview-reports/` |
-| Business Process detail | `@dt-business-process-review` | `process-detail-reports/` |
-| Business Observability dashboard builder | `@dt-business-dashboard-build` | `dashboards/` |
-| **Umbrella / flexible entry point** (routes to one of the above) | `@dt-business-observability` | *(delegates — no dedicated subfolder)* |
+| Bizevents / Business Observability overview | `@dt-bizevents-review` | `OUTPUT/<context>/reports/` |
+| Logs overview | `@dt-logs-review` | `OUTPUT/<context>/reports/` |
+| Business Process detail | `@dt-business-process-review` | `OUTPUT/<context>/reports/` |
+| Business Observability dashboard builder | `@dt-business-dashboard-build` | `OUTPUT/<context>/dashboards/` |
+| **Umbrella / flexible entry point** (routes to one of the above) | `@dt-business-observability` | *(delegates — inherits the target skill's location)* |
 
 The four named agents are 1:1 with a playbook skill and own explicit `@name`
 invocation. The **umbrella agent** (`@dt-business-observability`) is the
@@ -106,8 +106,28 @@ trigger keywords:
 Every agent reads `dt-playbook-common` first (Step 0 → context/folder
 confirmation → intent check), then runs the paired skill end-to-end and writes
 the deliverable to
-`<context-folder>/<subfolder>/<stem>-<YYYY-MM-DD-HHMM>.<ext>`
-(`.md` for reviews, `.json` for dashboards).
+`OUTPUT/<context-folder>/<kind>/<stem>-<YYYY-MM-DD-HHMM>.<ext>`
+(`<kind>` = `reports/` for reviews `.md`, `dashboards/` for dashboards `.json`).
+
+### Where output goes
+
+All generated artifacts live under a single top-level **`OUTPUT/`** directory,
+one subfolder per `dtctl` context, and within each context exactly two artifact
+folders:
+
+```
+OUTPUT/
+└── <context-folder>/          # = dtctl context name, e.g. acme-prod-readonly/
+    ├── reports/               # every .md review (bizevents, logs, process) + .handoff.yaml sidecars
+    └── dashboards/            # every dashboard .json
+```
+
+The review skills all share one `reports/` folder — filenames stay unique per
+playbook (`bizevents-overview-…`, `logs-overview-…`, `business-process-detail-…`),
+so finding a report is "`OUTPUT/` → tenant → `reports/`". `OUTPUT/` is
+gitignored. The `dt-playbook-common` skill prepends `OUTPUT/` automatically; the
+`.dt-playbook-mappings.yaml` `folder` field stores only the context-relative
+folder name.
 
 ### Chaining process review → dashboard build
 
@@ -121,7 +141,7 @@ cost on paired runs.
 Manual hand-off later (after reading the report):
 
 ```
-@dt-business-dashboard-build --from-report <context-folder>/process-detail-reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
+@dt-business-dashboard-build --from-report OUTPUT/<context-folder>/reports/business-process-detail-<YYYY-MM-DD-HHMM>.md
 ```
 
 ## Common commands (tips & tricks)
@@ -231,7 +251,7 @@ description: >-
 ## Parameters (consumed by dt-playbook-common)
 | Parameter | Value |
 | --- | --- |
-| `<subfolder>`     | `<name>-reports/` |
+| `<kind>`          | `reports/` (or `dashboards/`) |
 | `<filename-stem>` | `<name>-overview` |
 | `<records>`       | bizevents \| logs \| … |
 
@@ -257,7 +277,8 @@ Follow the conventions the existing skills already establish:
 ### Required: one row in the router
 
 Add a row to `skills/dt-playbook-router/SKILL.md`'s **Dispatch table** (target
-skill · intent · output subfolder) and bump that skill's version (minor). This
+skill · intent · output folder — `reports/` or `dashboards/`) and bump that
+skill's version (minor). This
 is what makes your new skill reachable through `@dt-business-observability`.
 
 ### Optional: a dedicated agent

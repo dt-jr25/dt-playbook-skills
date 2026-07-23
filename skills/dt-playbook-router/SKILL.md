@@ -48,15 +48,16 @@ Match the user's intent against the **Intent** column. Keep this table in sync
 with each skill's own frontmatter `description` — the description is the source
 of truth for that skill's trigger surface; this table is a routing summary.
 
-| Target skill | Route here when the user wants… | Output subfolder |
+| Target skill | Route here when the user wants… | Output folder |
 | --- | --- | --- |
-| `dt-bizevents-review` | A tenant-wide **bizevents / business-observability overview** — what business events exist, volume, providers, event types, data dictionary, correlation IDs, anomalies, metric opportunities. Breadth-first inventory. | `event-overview-reports/` |
-| `dt-logs-review` | A tenant-wide **logs overview** — volume, top emitters, severity mix, ingest sources, data dictionary, top error signatures, PII checks, parse-rule / metric opportunities. | `logs-overview-reports/` |
-| `dt-business-process-review` | A **deep-dive on one business process** — given providers + event types, characterize the happy path, branches, correlation IDs, funnel attrition, end-to-end duration, and recommend process/event metrics. Depth-first. | `process-detail-reports/` |
-| `dt-business-dashboard-build` | To **build / scaffold / generate a dashboard** — a Business Observability, business-KPI, business-process, or bizevents dashboard JSON for the Dashboards app. | `dashboards/` |
+| `dt-bizevents-review` | A tenant-wide **bizevents / business-observability overview** — what business events exist, volume, providers, event types, data dictionary, correlation IDs, anomalies, metric opportunities. Breadth-first inventory. | `OUTPUT/<context>/reports/` |
+| `dt-logs-review` | A tenant-wide **logs overview** — volume, top emitters, severity mix, ingest sources, data dictionary, top error signatures, PII checks, parse-rule / metric opportunities. | `OUTPUT/<context>/reports/` |
+| `dt-business-process-review` | A **deep-dive on one business process** — given providers + event types, characterize the happy path, branches, correlation IDs, funnel attrition, end-to-end duration, and recommend process/event metrics. Depth-first. | `OUTPUT/<context>/reports/` |
+| `dt-business-dashboard-build` | To **build / scaffold / generate a dashboard** — a Business Observability, business-KPI, business-process, or bizevents dashboard JSON for the Dashboards app. | `OUTPUT/<context>/dashboards/` |
 
 > ➕ **Adding a new team skill?** Add one row here (target skill · intent ·
-> subfolder) and bump this skill's version (minor). No agent file is required
+> output folder — `reports/` for `.md` playbooks, `dashboards/` for JSON
+> builders) and bump this skill's version (minor). No agent file is required
 > for the new skill to be reachable through the umbrella agent — see the repo
 > README's *Contributing* section.
 
