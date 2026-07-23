@@ -13,7 +13,7 @@ Generate a tenant-wide logs state-of-the-environment report for the active
 
 ## How to run
 
-1. **Read the `dt-playbook-common` skill first.** Follow its Step 0 verbatim — mappings file lookup, `dtctl auth whoami`, the two-question kickoff interview, optional new-context flow (Step 3a), folder creation, `.dt-playbook-mappings.yaml` persistence, and the mandatory final intent confirmation. Do not run any `dtctl query` until Step 0 completes with an explicit "Proceed" from the user.
+1. **Apply the Shared agent boilerplate from `dt-playbook-common`** (§Shared agent boilerplate) — run its Step 0 opener first and observe its shared hard rules. Do not run any `dtctl query` until Step 0 completes with an explicit "Proceed" from the user.
 2. **Read the `dt-logs-review` skill next.** Follow its Discovery Query Set (§1–§12), §Query guardrails (the 1-in-1000 sampling rules for 24 h queries), §What-to-Look-For checklist, and §Output Document Structure verbatim. Honour its parameter table (`<subfolder>=logs-overview-reports/`, `<filename-stem>=logs-overview`, `<records>=logs`).
 3. **Verify the three required domain skills are in your context before Step 1.** All three are installed by this repo's `ai.repo.yaml` manifest as part of the team's standard workspace setup. If any is not in your context, follow `dt-playbook-common` §Prerequisites' missing-skill procedure — print the install commands from the repo README and halt. **Do not run `aimgr`, `dtctl skills`, `npx`, or any other installer yourself.**
     - **`dtctl` operator skill** — the exact `dtctl query` invocations and PowerShell quoting caveats.
@@ -26,11 +26,11 @@ Generate a tenant-wide logs state-of-the-environment report for the active
 
 ## Hard rules
 
-- Never query before Step 0 finishes — the final intent confirmation fires on every invocation, even if the same context was confirmed earlier in the same conversation.
-- Never run a Discovery Query before the `dtctl` operator skill, `dt-dql-essentials`, and `dt-obs-logs` are loaded — if any is missing, print the repo README's install commands and halt. Never run `aimgr`, `dtctl skills`, or `npx` yourself.
+Apply the **Shared agent boilerplate** hard rules from `dt-playbook-common`
+(§Shared agent boilerplate) in full — Step-0 gating, domain-skill gating,
+never-overwrite, PII redaction, no runtime SKILL.md edits, self-improvement
+protocol, and the `dtctl` install/auth check. In addition, this playbook's
+sampling model adds two **skill-specific** hard rules:
+
 - Never run `matchesPhrase()` / `matchesRegex()` / `parse` over an unbounded window — sampling does not protect against that pattern.
 - Always label 24 h counts as sampled estimates (e.g. "~N (est. from 1-in-1000 sample)"). Always label `countDistinct` values from sampled queries as lower bounds.
-- Never overwrite an existing report file. Bump the minute (or append seconds) if a collision occurs.
-- Never paste raw PII / secrets / customer identifiers into the report — paraphrase or redact.
-- Never edit any `.github/skills/dt-*/SKILL.md` or any other `.agent.md` file at runtime. The only file you may write outside the report path is `<workspace-root>/.dt-playbook-mappings.yaml`, per the common skill's schema.
-- Confirm `dtctl` is installed (`dtctl version`) and the user is authenticated (`dtctl auth whoami`) before any query.

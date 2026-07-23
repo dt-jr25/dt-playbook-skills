@@ -14,7 +14,7 @@ of `event.provider`s and `event.type`s in the active `dtctl` context.
 
 ## How to run
 
-1. **Read the `dt-playbook-common` skill first.** Follow its Step 0 verbatim — mappings file lookup, `dtctl auth whoami`, the two-question kickoff interview, optional new-context flow (Step 3a), folder creation, `.dt-playbook-mappings.yaml` persistence, and the mandatory final intent confirmation. Do not run any `dtctl query` until Step 0 completes with an explicit "Proceed" from the user.
+1. **Apply the Shared agent boilerplate from `dt-playbook-common`** (§Shared agent boilerplate) — run its Step 0 opener first and observe its shared hard rules. Do not run any `dtctl query` until Step 0 completes with an explicit "Proceed" from the user.
 2. **Read the `dt-business-process-review` skill next.** Follow its Discovery Query Set (§1–§16), its two-part Step 2 focus interview (§2a pick providers, §2b pick event.types), §What-to-Look-For checklist, and §Output Document Structure verbatim. Honour its parameter table (`<subfolder>=process-detail-reports/`, `<filename-stem>=business-process-detail`, `<records>=bizevents`).
 3. **Verify the three required domain skills are in your context before Step 1.** All are installed by this repo's `ai.repo.yaml` manifest as part of the team's standard workspace setup. If any is not in your context, follow `dt-playbook-common` §Prerequisites' missing-skill procedure — print the install commands from the repo README and halt. **Do not run `aimgr`, `dtctl skills`, `npx`, or any other installer yourself.**
     - **`dtctl` operator skill** — the exact `dtctl query` invocations and PowerShell quoting caveats.
@@ -31,14 +31,15 @@ of `event.provider`s and `event.type`s in the active `dtctl` context.
 
 ## Hard rules
 
-- Never query before Step 0 finishes — the final intent confirmation fires on every invocation, even if the same context was confirmed earlier in the same conversation.
-- Never run a Discovery Query before the `dtctl` operator skill and `dt-dql-essentials` are loaded — if either is missing, print the repo README's install commands and halt. Never run `aimgr`, `dtctl skills`, or `npx` yourself.
+Apply the **Shared agent boilerplate** hard rules from `dt-playbook-common`
+(§Shared agent boilerplate) in full — Step-0 gating, domain-skill gating,
+never-overwrite, PII redaction, no runtime SKILL.md edits, self-improvement
+protocol, and the `dtctl` install/auth check. This playbook adds the following
+**skill-specific** hard rules:
+
 - Never run §5+ (deep-dive queries) before Step 2 has produced both `<providers>` and `<eventTypes>`.
 - Always calculate end-to-end duration stats on **completed** correlations only. Stalled / partial flows are reported separately (per §13).
 - Always produce both **process-level** and **event-level** metric tables in the report. Describe each metric in business terms, not purely technical ones.
-- Always write the `.handoff.yaml` sidecar on non-empty-scope runs, even if the user picks "No thanks" on the dashboard hand-off — they may `--from-report` later.
-- Never overwrite an existing report file. Bump the minute (or append seconds) if a collision occurs.
+- Always write the `.handoff.yaml` sidecar on non-empty-scope runs, even if the user picks "No thanks" on the dashboard hand-off — they may `--from-report` later. (This sidecar is the one extra artifact this agent may write beyond the shared boilerplate's allowed files.)
 - Never invoke `@dt-business-dashboard-build` from Step 4 without the user's explicit "Yes" pick — the hand-off is opt-in, not automatic. On "Not yet" the user can still trigger it later via `@dt-business-dashboard-build --from-report <path>`.
-- Never paste raw PII / secrets / customer identifiers into the report or the sidecar packet — packet carries field **names** only.
-- Never edit any `.github/skills/dt-*/SKILL.md` or any other `.agent.md` file at runtime. The only files you may write outside the report path are `<workspace-root>/.dt-playbook-mappings.yaml` (per the common skill's schema) and the `.handoff.yaml` sidecar next to the report.
-- Confirm `dtctl` is installed (`dtctl version`) and the user is authenticated (`dtctl auth whoami`) before any query.
+- The shared PII rule applies to the sidecar too: the `.handoff.yaml` packet carries field **names** only — never raw PII / secrets / customer identifiers.

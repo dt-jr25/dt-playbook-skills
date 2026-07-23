@@ -12,11 +12,21 @@ and custom agents for GitHub Copilot.
 | Logs overview | `@dt-logs-review` | `logs-overview-reports/` |
 | Business Process detail | `@dt-business-process-review` | `process-detail-reports/` |
 | Business Observability dashboard builder | `@dt-business-dashboard-build` | `dashboards/` |
+| **Umbrella / flexible entry point** (routes to one of the above) | `@dt-business-observability` | *(delegates — no dedicated subfolder)* |
 
-All four depend on the shared **`dt-playbook-common`** skill (Step 0 kickoff
+The four named agents are 1:1 with a playbook skill and own explicit `@name`
+invocation. The **umbrella agent** (`@dt-business-observability`) is the
+flexible entry point: it reads the **`dt-playbook-router`** skill to resolve an
+exploratory or cross-skill request to exactly one of the four playbooks and
+runs it verbatim. New team skills are reachable through the umbrella agent
+without needing their own agent — see
+[Contributing](#contributing-a-new-team-skill).
+
+All agents depend on the shared **`dt-playbook-common`** skill (Step 0 kickoff
 interview, context/folder confirmation, empty-tenant fast-path,
 duplicate-snapshot logic, PowerShell quoting rules, shared report style,
-self-improvement protocol).
+self-improvement protocol, and the **Shared agent boilerplate** every agent
+references for its Step-0 opener and hard-rules core).
 
 ## Prerequisites
 
@@ -74,6 +84,18 @@ In any Copilot chat inside the workspace, invoke the agent by name:
 @dt-business-process-review
 @dt-business-dashboard-build
 ```
+
+**Not sure which one?** Use the umbrella agent — it routes your request to the
+right playbook (and asks you to pick if two plausibly fit):
+
+```
+@dt-business-observability
+```
+
+Rule of thumb: **know the exact playbook → name it directly** (`@dt-<name>`);
+**exploratory / cross-skill / "help me review this tenant" → use
+`@dt-business-observability`**. The umbrella never blends two playbooks — it
+resolves to exactly one per run via the `dt-playbook-router` skill.
 
 Natural-language invocation also works — each skill's `description` carries
 trigger keywords:
@@ -172,8 +194,109 @@ edit by hand while a playbook is running — see `dt-playbook-common`'s
 Releases follow semver:
 
 - **patch** — typo / clarification fixes.
-- **minor** — additive (new query, new report section, new anomaly check).
+- **minor** — additive (new query, new report section, new anomaly check, a
+  new team skill + its `dt-playbook-router` dispatch-table row).
 - **major** — breaking report-shape change, removed query, renamed skill/agent.
+
+Adding a new team skill bumps `dt-playbook-router` (and, if you also add a
+dedicated agent, that agent) by **minor** — each playbook still carries its own
+independent semver.
+
+## Contributing a new team skill
+
+Adding a playbook or capability to this repo is intentionally cheap. The
+committed source of truth is only four things — `skills/dt-*/SKILL.md`,
+`agents/dt-*.md`, `ai.repo.yaml`, and this `README.md`. Everything under
+`.github/`, `.claude/`, and `ai.package.yaml` is **gitignored aimgr runtime
+state** — never hand-edit it, and never add your new skill to a resource list;
+`ai.repo.yaml` auto-discovers the `skills/` and `agents/` directories.
+
+### Required: the skill
+
+Create `skills/dt-<name>/SKILL.md` with YAML frontmatter and a body:
+
+```markdown
+---
+name: dt-<name>
+description: >-
+  One paragraph that doubles as the natural-language trigger surface. State
+  what the skill produces, the exact phrases that should invoke it (e.g.
+  "run an X review", "@dt-<name>"), that it reads `dt-playbook-common` FIRST
+  for Step 0, where it writes output, and a "Do NOT use for …" line pointing
+  at sibling skills so routing stays clean.
+---
+
+# 📓 <Title> — Playbook
+
+## Parameters (consumed by dt-playbook-common)
+| Parameter | Value |
+| --- | --- |
+| `<subfolder>`     | `<name>-reports/` |
+| `<filename-stem>` | `<name>-overview` |
+| `<records>`       | bizevents \| logs \| … |
+
+## Discovery Query Set        # §1…§N — your DQL, tight time windows + limits
+## What to Look For           # the checklist that drives findings
+## Output Document Structure  # the report skeleton
+```
+
+Follow the conventions the existing skills already establish:
+
+- **Read `dt-playbook-common` first.** Your skill inherits Step 0, the mapping
+  file, the empty-tenant fast-path, duplicate-snapshot logic, PowerShell
+  quoting rules, the self-improvement protocol, and the **Shared agent
+  boilerplate**. Only own what is data-source-specific (queries, checklist,
+  report shape).
+- **Cost guardrails.** Every Discovery Query uses tight `from:` windows and a
+  `limit` (see `dt-playbook-common` §Prerequisites) — Grail tables are large.
+- **Declare prerequisites.** List the domain skills your queries need (`dtctl`
+  operator skill and `dt-dql-essentials` at minimum; add data-source skills
+  like `dt-obs-logs` or `dt-app-dashboards` as needed). The agent detects and
+  reports a missing skill — it never installs one.
+
+### Required: one row in the router
+
+Add a row to `skills/dt-playbook-router/SKILL.md`'s **Dispatch table** (target
+skill · intent · output subfolder) and bump that skill's version (minor). This
+is what makes your new skill reachable through `@dt-business-observability`.
+
+### Optional: a dedicated agent
+
+Only add `agents/dt-<name>.md` if the playbook deserves a first-class `@name`
+entry point (a common, frequently-invoked workflow). Keep it thin — reference
+the **Shared agent boilerplate** from `dt-playbook-common` and add only your
+skill-specific steps, parameter table, required-domain-skill list, and any
+hard rules unique to the playbook. A minimal shim:
+
+```markdown
+---
+description: Runs the <…> playbook end-to-end. Invoke with `@dt-<name>` when …
+---
+# dt-<name> agent
+
+## How to run
+1. **Apply the Shared agent boilerplate from `dt-playbook-common`** (§Shared agent boilerplate) — run its Step 0 opener first and observe its shared hard rules.
+2. **Read the `dt-<name>` skill next.** Follow its Discovery Query Set, checklist, and Output Document Structure verbatim. Honour its parameter table.
+3. … skill-specific steps …
+
+## Hard rules
+Apply the **Shared agent boilerplate** hard rules from `dt-playbook-common` in full, plus:
+- … only rules unique to this playbook …
+```
+
+If you skip the dedicated agent, the skill is still fully usable via
+`@dt-business-observability` and (where the host supports it) its own
+description-based auto-trigger — this is how the agent layer stays flat as the
+skill count grows.
+
+### Checklist
+
+- [ ] `skills/dt-<name>/SKILL.md` created (frontmatter + parameters + queries + report shape).
+- [ ] Row added to the `dt-playbook-router` dispatch table (+ minor version bump).
+- [ ] Contents table row added in this README.
+- [ ] Optional `agents/dt-<name>.md` shim added **only** if a first-class `@name` is warranted.
+- [ ] No edit to `ai.package.yaml` / `.github/` / `.claude/` (gitignored, auto-discovered).
+- [ ] Version bumped per [Versioning](#versioning) (minor for an additive skill).
 
 ## Contributing improvements
 

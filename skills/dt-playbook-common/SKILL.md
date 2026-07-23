@@ -1,6 +1,6 @@
 ---
 name: dt-playbook-common
-description: Shared scaffolding for every Dynatrace environment-review playbook (dt-bizevents-review, dt-logs-review, dt-business-process-review). Owns the Step 0 kickoff interview, dtctl context/folder confirmation, intent confirmation, the per-workspace mapping file (.dt-playbook-mappings.yaml), empty-tenant fast-path, duplicate-snapshot logic, PowerShell quoting rules, shared report style, and the self-improvement protocol. Read this skill FIRST whenever any dt-*-review skill or agent is invoked — it sets up the run so the per-data-source skill can focus on its Discovery Query Set and report shape.
+description: Shared scaffolding for every Dynatrace environment-review playbook (dt-bizevents-review, dt-logs-review, dt-business-process-review, dt-business-dashboard-build) and the dt-business-observability umbrella agent. Owns the Step 0 kickoff interview, dtctl context/folder confirmation, intent confirmation, the per-workspace mapping file (.dt-playbook-mappings.yaml), empty-tenant fast-path, duplicate-snapshot logic, PowerShell quoting rules, shared report style, the self-improvement protocol, and the Shared agent boilerplate (the Step-0 opener + hard-rules core every dt-* agent references). Read this skill FIRST whenever any dt-*-review skill or agent is invoked — it sets up the run so the per-data-source skill can focus on its Discovery Query Set and report shape.
 ---
 
 # 🧰 Playbook Common Scaffolding
@@ -335,6 +335,52 @@ The agent should always **re-run all queries** for the new environment rather th
    - Generic DQL tips already covered by the `dt-dql-essentials` or related skills.
    - Reformatting / cosmetic preferences unless the user explicitly asked.
    - New `dtctl` context entries — those go to `.dt-playbook-mappings.yaml` automatically and do not require a PR.
+
+---
+
+## 🧩 Shared agent boilerplate
+
+> **For agent files only.** Every `dt-*` agent in this repo (the four named
+> playbook agents and the `dt-business-observability` umbrella agent) shares
+> the small core below. Instead of restating it, an agent file references this
+> section by name — *"apply the Shared agent boilerplate from
+> `dt-playbook-common`"* — and keeps only its own skill-specific steps and
+> hard rules. This is the single source of truth for the shared core; edit it
+> here, not in each agent.
+
+### Shared "how to run" opener (every agent's first step)
+
+> **Read the `dt-playbook-common` skill first.** Follow its Step 0 verbatim —
+> mappings file lookup, `dtctl auth whoami`, the two-question kickoff
+> interview, optional new-context flow (Step 3a), folder creation,
+> `.dt-playbook-mappings.yaml` persistence, and the mandatory final intent
+> confirmation. Do not run any `dtctl query` until Step 0 completes with an
+> explicit "Proceed" from the user.
+
+### Missing-skill handling (shared)
+
+Each agent names its own required domain skills. If any is not in the agent's
+context by the point it's needed, follow §Prerequisites' missing-skill
+procedure above — print the install commands from the repo README and halt.
+**Never run `aimgr`, `dtctl skills`, `npx`, or any other installer yourself.**
+
+### Shared hard rules (apply to every agent)
+
+- Never query before Step 0 finishes — the final intent confirmation fires on every invocation, even if the same context was confirmed earlier in the same conversation.
+- Never run a Discovery Query before that playbook's required domain skills are loaded — if any is missing, print the repo README's install commands and halt. Never run `aimgr`, `dtctl skills`, or `npx` yourself.
+- Never overwrite an existing report / dashboard file. Bump the minute (or append seconds) if a collision occurs.
+- Never paste raw PII / secrets / customer identifiers into a report, sidecar, or dashboard — paraphrase or redact.
+- Never edit any `.github/skills/dt-*/SKILL.md` or any other `.agent.md` file at runtime. The only file every agent may write outside its own deliverable is `<workspace-root>/.dt-playbook-mappings.yaml`, per this skill's schema. (A playbook that produces additional artifacts — e.g. a `.handoff.yaml` sidecar — declares those in its own hard rules.)
+- After the deliverable is saved, run the §Playbook self-improvement protocol above: surface at most one batched PR suggestion if you noticed a concrete gap, otherwise stay silent.
+- Confirm `dtctl` is installed (`dtctl version`) and the user is authenticated (`dtctl auth whoami`) before any query.
+
+> An agent keeps in its own file only what is genuinely skill-specific: its
+> `description`, its "what you do" summary, its numbered playbook steps
+> (focus interview, deep-dive range, report path), its required-domain-skill
+> list, and any hard rules unique to it (e.g. dashboard-build's tile-budget /
+> no-import rules, process-review's two-part interview + hand-off rules,
+> logs-review's sampling rules, the umbrella agent's one-skill-per-run /
+> no-blend routing rules).
 
 ---
 
